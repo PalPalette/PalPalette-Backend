@@ -514,10 +514,32 @@ export class DeviceWebSocketService implements OnApplicationBootstrap {
     }
   }
 
+  // Validate UUID v4 format helper
+  private isValidUuid(id: string): boolean {
+    // UUID v4 format: 8-4-4-4-12 hex (case-insensitive)
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+  }
+
   private async handleLightingSystemTest(ws: WebSocket, data: any) {
     this.logger.log("Handling lighting system test result:", data);
 
     try {
+      // Validate deviceId is a canonical UUID before using in outgoing request
+      if (!data.deviceId || !this.isValidUuid(data.deviceId)) {
+        this.logger.error(
+          `❌ Refusing lighting system test result for invalid deviceId: ${data.deviceId}`
+        );
+        ws.send(
+          JSON.stringify({
+            event: "lightingTestError",
+            data: {
+              error: "Invalid deviceId format. Expected UUID.",
+            },
+          })
+        );
+        return;
+      }
+
       // Update lighting system test result via HTTP API
       const response = await fetch(
         `http://localhost:3000/devices/${data.deviceId}/lighting`,
