@@ -1,0 +1,128 @@
+# Environment files - IMPORTANT: Never commit these!
+.env
+.env.*
+!.env.example
+!.env.production.example
+
+# Node.js / NestJS
+node_modules/
+dist/
+build/
+.DS_Store
+.cache/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# OS generated files
+Thumbs.db
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Desktop.ini
+
+# Editor directories and files
+.vscode/
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+
+# Backend specific
+backend/node_modules/
+backend/dist/
+backend/.env
+backend/.env.*
+backend/uploads/
+backend/.nyc_output/
+backend/coverage/
+
+# Mobile App specific
+palpalette-app/node_modules/
+palpalette-app/dist/
+palpalette-app/.env
+palpalette-app/android/app/release/
+palpalette-app/android/app/debug/output.json
+palpalette-app/ios/App/build/
+palpalette-app/ios/App/Pods/
+palpalette-app/www/
+palpalette-app/.angular/
+
+# Controller/Firmware specific
+controller/.pio/
+controller/.pioenvs/
+controller/build/
+controller/lib/
+controller/.vscode/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+data/
+postgres-data/
+
+# Docker
+.docker/
+docker-compose.override.yml
+
+# Deployment
+deployment/
+releases/
+
+# Testing
+coverage/
+.nyc_output/
+junit.xml
+
+# Temporary files
+*.tmp
+*.swp
+.tmp/
+temp/
+.cache/
+
+# Archives
+*.zip
+*.tar.gz
+*.7z
+
+# Security
+*.pem
+*.key
+*.crt
+*.p12
+secrets/
+credentials/
+
+# IDE
+.project
+.classpath
+.settings/
+.metadata/
+
+# Misc
+*.tgz
+*.tar.gz
+.yarn-integrity
+.npm/
+
+# 
+LOCAL_DEVELOPMENT.md
+SEAMLESS_AUTH_IMPLEMENTATION.md
+brief.md
