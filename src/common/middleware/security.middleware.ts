@@ -14,6 +14,15 @@ export class SecurityMiddleware implements NestMiddleware {
       "geolocation=(), microphone=(), camera=()"
     );
 
+    // Add HTTPS security headers if connection is secure
+    if (req.secure || req.headers['x-forwarded-proto'] === 'https') {
+      // HSTS (HTTP Strict Transport Security) - only send over HTTPS
+      res.setHeader(
+        "Strict-Transport-Security",
+        "max-age=31536000; includeSubDomains; preload"
+      );
+    }
+
     // Remove server header
     res.removeHeader("X-Powered-By");
 

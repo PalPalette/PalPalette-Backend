@@ -12,7 +12,8 @@
         "migration:run": "node --require tsconfig-paths/register ./node_modules/typeorm/cli.js migration:run -d dist/data-source.js",
         "migration:generate": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:generate src/migrations/GeneratedMigration -d src/data-source.ts",
         "seed": "node dist/seeds/seed.js",
-        "populate-secrets": "ts-node -r tsconfig-paths/register src/scripts/run-populate-secrets.ts"
+        "populate-secrets": "ts-node -r tsconfig-paths/register src/scripts/run-populate-secrets.ts",
+        "generate-ssl-cert": "./scripts/generate-ssl-cert.sh"
     },
     "dependencies": {
         "@nestjs/common": "^11.1.5",
