@@ -3,10 +3,11 @@ import {
   IsNumber,
   IsOptional,
   IsEnum,
-  IsPort,
+  Min,
+  Max,
   MinLength,
 } from "class-validator";
-import { Transform } from "class-transformer";
+import { Transform, Type } from "class-transformer";
 
 export enum NodeEnvironment {
   DEVELOPMENT = "development",
@@ -19,13 +20,17 @@ export class EnvironmentVariables {
   @IsOptional()
   NODE_ENV: NodeEnvironment = NodeEnvironment.DEVELOPMENT;
 
-  @IsPort()
-  @Transform(({ value }) => parseInt(value, 10))
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  @Max(65535)
   @IsOptional()
   PORT: number = 3000;
 
-  @IsPort()
-  @Transform(({ value }) => parseInt(value, 10))
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  @Max(65535)
   @IsOptional()
   WEBSOCKET_PORT: number = 3001;
 
@@ -33,8 +38,10 @@ export class EnvironmentVariables {
   @IsString()
   DB_HOST: string;
 
+  @Type(() => Number)
   @IsNumber()
-  @Transform(({ value }) => parseInt(value, 10))
+  @Min(1)
+  @Max(65535)
   DB_PORT: number;
 
   @IsString()
