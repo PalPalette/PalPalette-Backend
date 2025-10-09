@@ -32,13 +32,25 @@ export class UsersService {
       throw new ConflictException("User with this email already exists");
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = await this.hashPassword(password);
     const user = this.userRepository.create({
       email,
       passwordHash: hashedPassword,
       displayName,
     });
     return this.userRepository.save(user);
+  }
+
+  async hashPassword(password: string): Promise<string> {
+    const saltRounds = 12; // Increased from 10 to 12 for better security
+    return bcrypt.hash(password, saltRounds);
+  }
+
+  async validatePassword(
+    password: string,
+    hashedPassword: string
+  ): Promise<boolean> {
+    return bcrypt.compare(password, hashedPassword);
   }
 
   async findByEmail(email: string): Promise<User | null> {

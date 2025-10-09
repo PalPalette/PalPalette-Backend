@@ -81,22 +81,42 @@ export class DeviceWebSocketService implements OnApplicationBootstrap {
             const message = JSON.parse(data.toString());
             this.handleMessage(ws, message);
           } catch (error) {
-            this.logger.error(`JSON parse error: ${error.message}`);
-            ws.send(JSON.stringify({ error: "Invalid JSON" }));
+            this.logger.error(
+              `JSON parse error from ${clientIP}: ${error.message}`,
+              error.stack
+            );
+            // Send error response safely
+            if (ws.readyState === WebSocket.OPEN) {
+              try {
+                ws.send(
+                  JSON.stringify({
+                    error: "Invalid JSON format",
+                    timestamp: new Date().toISOString(),
+                  })
+                );
+              } catch (sendError) {
+                this.logger.error(
+                  `Failed to send error response to ${clientIP}: ${sendError.message}`
+                );
+              }
+            }
           }
         });
 
-        ws.on("close", () => {
+        ws.on("close", (code, reason) => {
           this.logger.log(
-            `ESP32 WebSocket client disconnected from: ${clientIP}`
+            `ESP32 WebSocket client disconnected from: ${clientIP} (code: ${code}, reason: ${reason})`
           );
           this.removeDeviceConnection(ws);
         });
 
         ws.on("error", (error) => {
           this.logger.error(
-            `WebSocket error from ${clientIP}: ${error.message}`
+            `WebSocket error from ${clientIP}: ${error.message}`,
+            error.stack
           );
+          // Cleanup connection on error
+          this.removeDeviceConnection(ws);
         });
       });
 
@@ -582,43 +602,83 @@ export class DeviceWebSocketService implements OnApplicationBootstrap {
   }
 
   sendColorPaletteToDevice(deviceId: string, palette: any): boolean {
-    this.logger.debug(
-      `Attempting to send color palette to device: ${deviceId}`
-    );
-    this.logger.debug(
-      `Currently connected devices: ${Array.from(
-        this.deviceConnections.keys()
-      ).join(", ")}`
-    );
-
-    // deviceId should be a database UUID
-    const ws = this.deviceConnections.get(deviceId);
-
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      const message = {
-        event: "colorPalette",
-        messageId: palette.messageId,
-        senderId: palette.senderId,
-        senderName: palette.senderName,
-        colors: palette.colors,
-        timestamp: palette.timestamp || Date.now(),
-      };
-
-      ws.send(JSON.stringify(message));
-      this.logger.log(`Color palette sent to device: ${deviceId}`);
-      return true;
-    }
-
-    if (ws) {
-      this.logger.warn(
-        `Device ${deviceId} WebSocket connection state: ${ws.readyState} (expected: ${WebSocket.OPEN})`
+    try {
+      this.logger.debug(
+        `Attempting to send color palette to device: ${deviceId}`
       );
-    } else {
-      this.logger.warn(`Device ${deviceId} not found in connections map`);
-    }
+      this.logger.debug(
+        `Currently connected devices: ${Array.from(
+          this.deviceConnections.keys()
+        ).join(", ")}`
+      );
 
-    this.logger.warn(`Device ${deviceId} not connected`);
-    return false;
+      // Validate input parameters
+      if (!deviceId || typeof deviceId !== "string") {
+        this.logger.error(
+          "Invalid deviceId provided to sendColorPaletteToDevice"
+        );
+        return false;
+      }
+
+      if (!palette || !palette.colors || !Array.isArray(palette.colors)) {
+        this.logger.error(
+          "Invalid palette provided to sendColorPaletteToDevice"
+        );
+        return false;
+      }
+
+      // deviceId should be a database UUID
+      const ws = this.deviceConnections.get(deviceId);
+
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        const message = {
+          event: "colorPalette",
+          messageId: palette.messageId,
+          senderId: palette.senderId,
+          senderName: palette.senderName,
+          colors: palette.colors,
+          timestamp: palette.timestamp || Date.now(),
+        };
+
+        try {
+          ws.send(JSON.stringify(message));
+          this.logger.log(`Color palette sent to device: ${deviceId}`);
+          return true;
+        } catch (sendError) {
+          this.logger.error(
+            `Failed to send message to device ${deviceId}: ${sendError.message}`,
+            sendError.stack
+          );
+          // Remove broken connection
+          this.removeDeviceConnection(ws);
+          return false;
+        }
+      }
+
+      if (ws) {
+        this.logger.warn(
+          `Device ${deviceId} WebSocket connection state: ${ws.readyState} (expected: ${WebSocket.OPEN})`
+        );
+        // Clean up non-open connections
+        if (
+          ws.readyState === WebSocket.CLOSED ||
+          ws.readyState === WebSocket.CLOSING
+        ) {
+          this.removeDeviceConnection(ws);
+        }
+      } else {
+        this.logger.warn(`Device ${deviceId} not found in connections map`);
+      }
+
+      this.logger.warn(`Device ${deviceId} not connected`);
+      return false;
+    } catch (error) {
+      this.logger.error(
+        `Unexpected error in sendColorPaletteToDevice for device ${deviceId}: ${error.message}`,
+        error.stack
+      );
+      return false;
+    }
   }
 
   notifyDeviceClaimed(deviceId: string, claimData: any): boolean {

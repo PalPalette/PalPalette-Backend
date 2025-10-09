@@ -1,6 +1,6 @@
 import { Injectable, UnauthorizedException, Logger } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, LessThan } from "typeorm";
+import { InjectRepository, InjectDataSource } from "@nestjs/typeorm";
+import { Repository, LessThan, DataSource } from "typeorm";
 import { UsersService } from "../users/users.service";
 import { JwtService } from "@nestjs/jwt";
 import { LoginRequestDto } from "./dto/login-request.dto";
@@ -22,7 +22,9 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     @InjectRepository(RefreshToken)
-    private readonly refreshTokenRepository: Repository<RefreshToken>
+    private readonly refreshTokenRepository: Repository<RefreshToken>,
+    @InjectDataSource()
+    private readonly dataSource: DataSource
   ) {
     // Clean up expired refresh tokens every hour
     setInterval(() => this.cleanupExpiredTokens(), 60 * 60 * 1000);
@@ -32,7 +34,10 @@ export class AuthService {
     const user = await this.usersService.findByEmail(email);
     if (!user) return null;
 
-    const isMatch = await bcrypt.compare(password, user.passwordHash);
+    const isMatch = await this.usersService.validatePassword(
+      password,
+      user.passwordHash
+    );
     if (!isMatch) return null;
 
     return user;
@@ -43,30 +48,40 @@ export class AuthService {
     ipAddress?: string,
     userAgent?: string
   ): Promise<AuthResponseDto> {
-    // Create the user using the users service
-    const user = await this.usersService.register(registerUserDto);
+    return this.dataSource.transaction(async (manager) => {
+      try {
+        // Create the user using the users service
+        const user = await this.usersService.register(registerUserDto);
 
-    // Generate tokens for immediate login
-    const tokens = await this.generateTokenPair(
-      user,
-      registerUserDto.device_name,
-      ipAddress,
-      userAgent
-    );
+        // Generate tokens for immediate login within the transaction
+        const tokens = await this.generateTokenPairWithManager(
+          manager,
+          user,
+          registerUserDto.device_name,
+          ipAddress,
+          userAgent
+        );
 
-    this.logger.log(`User ${user.id} registered and logged in successfully`);
+        this.logger.log(
+          `User ${user.id} registered and logged in successfully`
+        );
 
-    return {
-      access_token: tokens.accessToken,
-      refresh_token: tokens.refreshToken,
-      token_type: "Bearer",
-      expires_in: 900, // 15 minutes in seconds
-      user: {
-        id: user.id,
-        email: user.email,
-        displayName: user.displayName,
-      },
-    };
+        return {
+          access_token: tokens.accessToken,
+          refresh_token: tokens.refreshToken,
+          token_type: "Bearer",
+          expires_in: 900, // 15 minutes in seconds
+          user: {
+            id: user.id,
+            email: user.email,
+            displayName: user.displayName,
+          },
+        };
+      } catch (error) {
+        this.logger.error(`Registration failed: ${error.message}`, error.stack);
+        throw error;
+      }
+    });
   }
 
   async login(
@@ -233,6 +248,44 @@ export class AuthService {
     });
 
     await this.refreshTokenRepository.save(refreshTokenEntity);
+
+    return {
+      accessToken,
+      refreshToken: refreshTokenValue,
+    };
+  }
+
+  private async generateTokenPairWithManager(
+    manager: any,
+    user: any,
+    deviceName?: string,
+    ipAddress?: string,
+    userAgent?: string
+  ): Promise<{ accessToken: string; refreshToken: string }> {
+    const payload = { sub: user.id, email: user.email };
+    const accessToken = this.jwtService.sign(payload, {
+      expiresIn: this.ACCESS_TOKEN_EXPIRY,
+    });
+
+    const refreshTokenValue = this.generateSecureToken();
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + this.REFRESH_TOKEN_EXPIRY_DAYS);
+
+    const refreshTokenEntity = manager.create(RefreshToken, {
+      token: refreshTokenValue,
+      userId: user.id,
+      deviceName,
+      ipAddress,
+      userAgent,
+      expiresAt,
+      deviceFingerprint: this.generateDeviceFingerprint(
+        deviceName,
+        userAgent,
+        ipAddress
+      ),
+    });
+
+    await manager.save(refreshTokenEntity);
 
     return {
       accessToken,
