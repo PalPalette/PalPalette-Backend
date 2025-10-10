@@ -378,7 +378,7 @@ export class DevicesController {
 
       // TODO: Implement real-time notification delivery to user's mobile app
       // For now, we'll log the notification and return success
-      console.log(`User notification for device ${notificationDto.deviceId}:`, {
+      console.log("User notification for device %s:", notificationDto.deviceId, {
         action: notificationDto.action,
         message: notificationDto.message,
         userId: device.user.id,
