@@ -17,6 +17,7 @@ import {
   SendPaletteToFriendsDto,
 } from "./dto/color-palette.dto";
 import { FriendsService } from "./friends.service";
+import { UsersService } from "./users.service";
 import { MessagesGateway } from "../messages/messages.gateway";
 
 @Injectable()
@@ -31,6 +32,8 @@ export class ColorPalettesService {
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     private readonly friendsService: FriendsService,
+    @Inject(forwardRef(() => UsersService))
+    private readonly usersService: UsersService,
     @Inject(forwardRef(() => MessagesGateway))
     private readonly messagesGateway: MessagesGateway
   ) {}
@@ -174,26 +177,30 @@ export class ColorPalettesService {
 
         const savedMessage = await this.messageRepository.save(message);
 
-        // Send to recipient's devices via WebSocket
-        const recipientDevices = await this.deviceRepository.find({
-          where: { user: { id: friendId } },
-        });
+        // Check if recipient is within their messaging timeframe
+        const isWithinTimeframe =
+          this.usersService.isWithinMessagingTimeframe(recipient);
 
-        for (const device of recipientDevices) {
-          const delivered = await this.messagesGateway.sendColorPaletteToDevice(
-            device.id,
-            {
-              colors: savedMessage.colors,
-              messageId: savedMessage.id,
-              senderId: userId,
-              senderName: sender?.displayName || sender?.email,
-              timestamp: savedMessage.sentAt,
+        // Send to recipient's devices via WebSocket only if within timeframe
+        if (isWithinTimeframe) {
+          const recipientDevices = await this.deviceRepository.find({
+            where: { user: { id: friendId } },
+          });
+
+          for (const device of recipientDevices) {
+            const delivered =
+              await this.messagesGateway.sendColorPaletteToDevice(device.id, {
+                colors: savedMessage.colors,
+                messageId: savedMessage.id,
+                senderId: userId,
+                senderName: sender?.displayName || sender?.email,
+                timestamp: savedMessage.sentAt,
+              });
+
+            if (delivered) {
+              savedMessage.deliveredAt = new Date();
+              await this.messageRepository.save(savedMessage);
             }
-          );
-
-          if (delivered) {
-            savedMessage.deliveredAt = new Date();
-            await this.messageRepository.save(savedMessage);
           }
         }
 

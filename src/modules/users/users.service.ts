@@ -3,6 +3,7 @@ import {
   Inject,
   forwardRef,
   ConflictException,
+  BadRequestException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
@@ -10,6 +11,10 @@ import { User } from "./entities/user.entity";
 import { RegisterUserDto } from "./dto/register-user.dto";
 import { MessagesService } from "../messages/messages.service";
 import { MessagesGateway } from "../messages/messages.gateway";
+import {
+  SetMessageTimeframeDto,
+  MessageTimeframeResponseDto,
+} from "./dto/message-timeframe.dto";
 import * as bcrypt from "bcrypt";
 
 @Injectable()
@@ -106,5 +111,100 @@ export class UsersService {
     } else {
       return { success: false, message: "Device not connected" };
     }
+  }
+
+  // Message timeframe functionality
+  async setMessageTimeframe(
+    userId: string,
+    dto: SetMessageTimeframeDto
+  ): Promise<MessageTimeframeResponseDto> {
+    // Validate that both times are provided or both are cleared
+    if (
+      (dto.messageStartTime && !dto.messageEndTime) ||
+      (!dto.messageStartTime && dto.messageEndTime)
+    ) {
+      throw new BadRequestException(
+        "Both start and end times must be provided together, or both cleared"
+      );
+    }
+
+    // If times are provided, validate that start time is before end time
+    if (dto.messageStartTime && dto.messageEndTime) {
+      const startTime = this.parseTimeString(dto.messageStartTime);
+      const endTime = this.parseTimeString(dto.messageEndTime);
+
+      if (startTime >= endTime) {
+        throw new BadRequestException("Start time must be before end time");
+      }
+    }
+
+    // Convert HH:mm format to HH:mm:ss for database storage
+    const update: Partial<User> = {};
+    if (dto.messageStartTime) {
+      update.messageStartTime = dto.messageStartTime + ":00";
+    } else {
+      update.messageStartTime = null;
+    }
+
+    if (dto.messageEndTime) {
+      update.messageEndTime = dto.messageEndTime + ":00";
+    } else {
+      update.messageEndTime = null;
+    }
+
+    await this.userRepository.update(userId, update);
+
+    return this.getMessageTimeframe(userId);
+  }
+
+  async getMessageTimeframe(
+    userId: string
+  ): Promise<MessageTimeframeResponseDto> {
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      select: ["messageStartTime", "messageEndTime"],
+    });
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    // Convert HH:mm:ss format back to HH:mm for API response
+    const startTime = user.messageStartTime
+      ? user.messageStartTime.substring(0, 5)
+      : null;
+    const endTime = user.messageEndTime
+      ? user.messageEndTime.substring(0, 5)
+      : null;
+
+    return {
+      messageStartTime: startTime,
+      messageEndTime: endTime,
+      isConfigured: !!(startTime && endTime),
+    };
+  }
+
+  // Helper method to check if current time is within user's messaging timeframe
+  isWithinMessagingTimeframe(user: User): boolean {
+    if (!user.messageStartTime || !user.messageEndTime) {
+      return true; // No timeframe configured, always allow messages
+    }
+
+    const now = new Date();
+    const currentTime = this.parseTimeString(
+      now.toTimeString().substring(0, 5)
+    ); // Get HH:mm from current time
+
+    const startTime = this.parseTimeString(
+      user.messageStartTime.substring(0, 5)
+    );
+    const endTime = this.parseTimeString(user.messageEndTime.substring(0, 5));
+
+    return currentTime >= startTime && currentTime <= endTime;
+  }
+
+  private parseTimeString(timeStr: string): number {
+    const [hours, minutes] = timeStr.split(":").map(Number);
+    return hours * 60 + minutes; // Convert to minutes for easy comparison
   }
 }

@@ -13,6 +13,8 @@ export class TestFixtures {
     user.email = overrides.email || "test@example.com";
     user.passwordHash = overrides.passwordHash || "$2b$10$hashedpassword";
     user.displayName = overrides.displayName || "Test User";
+    user.messageStartTime = overrides.messageStartTime;
+    user.messageEndTime = overrides.messageEndTime;
     user.createdAt = overrides.createdAt || new Date();
     user.updatedAt = overrides.updatedAt || new Date();
     user.devices = overrides.devices || [];
