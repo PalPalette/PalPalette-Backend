@@ -35,6 +35,8 @@ import {
   SetMessageTimeframeDto,
   MessageTimeframeResponseDto,
 } from "./dto/message-timeframe.dto";
+import { FriendDto } from "./dto/friend.dto";
+import { DevicesService } from "../devices/devices.service";
 
 @ApiTags("Users")
 @Controller("users")
@@ -42,7 +44,8 @@ export class UsersController {
   constructor(
     private readonly usersService: UsersService,
     private readonly friendsService: FriendsService,
-    private readonly palettesService: ColorPalettesService
+    private readonly palettesService: ColorPalettesService,
+    private readonly devicesService: DevicesService
   ) {}
 
   @Post("register")
@@ -91,10 +94,33 @@ export class UsersController {
   @ApiResponse({
     status: 200,
     description: "List of friends retrieved successfully",
+    type: [FriendDto],
   })
   @ApiResponse({ status: 401, description: "Unauthorized" })
-  async getFriends(@Request() req) {
-    return this.friendsService.getFriends(req.user.userId);
+  async getFriends(@Request() req): Promise<FriendDto[]> {
+    // Check for ?includeDevices=true
+    const includeDevices = req.query?.includeDevices === "true";
+    const friends = await this.friendsService.getFriends(req.user.userId);
+    if (!includeDevices) {
+      // Only return safe fields
+      return friends.map((friend) => ({
+        id: friend.id,
+        displayName: friend.displayName,
+        email: friend.email,
+      }));
+    }
+    // With devices
+    return Promise.all(
+      friends.map(async (friend) => {
+        const devices = await this.devicesService.findUserDevices(friend.id);
+        return {
+          id: friend.id,
+          displayName: friend.displayName,
+          email: friend.email,
+          devices: devices.map((d) => ({ id: d.id, name: d.name, type: d.type })),
+        };
+      })
+    );
   }
 
   @UseGuards(JwtAuthGuard)
