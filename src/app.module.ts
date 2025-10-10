@@ -7,12 +7,15 @@ import { UsersModule } from "./modules/users/users.module";
 import { DevicesModule } from "./modules/devices/devices.module";
 import { MessagesModule } from "./modules/messages/messages.module";
 import { AuthModule } from "./modules/auth/auth.module";
-import { APP_GUARD } from "@nestjs/core";
+import { APP_GUARD, APP_FILTER } from "@nestjs/core";
 import { JwtAuthGuard } from "./modules/auth/jwt-auth.guard";
+import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({
+      isGlobal: true,
+    }),
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -59,6 +62,10 @@ import { JwtAuthGuard } from "./modules/auth/jwt-auth.guard";
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
+    },
+    {
+      provide: APP_FILTER,
+      useClass: AllExceptionsFilter,
     },
   ],
 })

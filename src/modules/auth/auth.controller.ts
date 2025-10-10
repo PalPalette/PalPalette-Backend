@@ -38,6 +38,7 @@ export class AuthController {
   @Public()
   @Post("register")
   @Throttle({ default: { limit: 3, ttl: 60000 } }) // 3 attempts per minute
+  @Throttle({ short: { limit: 1, ttl: 10000 } }) // 1 attempt per 10 seconds
   @ApiOperation({ summary: "Register a new user" })
   @ApiResponse({
     status: 201,
@@ -58,6 +59,7 @@ export class AuthController {
   @Public()
   @Post("login")
   @Throttle({ default: { limit: 5, ttl: 60000 } }) // 5 attempts per minute
+  @Throttle({ short: { limit: 2, ttl: 10000 } }) // 2 attempts per 10 seconds
   @ApiOperation({ summary: "Login user and get access tokens" })
   @ApiResponse({
     status: 200,

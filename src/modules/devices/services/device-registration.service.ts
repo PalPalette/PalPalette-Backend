@@ -2,6 +2,7 @@ import {
   Injectable,
   ConflictException,
   NotFoundException,
+  Logger,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
@@ -11,6 +12,8 @@ import { UpdateStatusDto } from "../dto/device-pairing/update-status.dto";
 
 @Injectable()
 export class DeviceRegistrationService {
+  private readonly logger = new Logger(DeviceRegistrationService.name);
+
   constructor(
     @InjectRepository(Device)
     private readonly deviceRepository: Repository<Device>
@@ -166,22 +169,48 @@ export class DeviceRegistrationService {
     deviceId: string,
     updateStatusDto: UpdateStatusDto
   ): Promise<Device> {
-    let macAddress = deviceId;
-
-    // If deviceId starts with "esp32-", extract the MAC address and format it
-    if (deviceId.startsWith("esp32-")) {
-      const macHex = deviceId.substring(6); // Remove "esp32-" prefix
-      // Convert from "b0818405ff98" to "B0:81:84:05:FF:98"
-      macAddress = macHex.match(/.{2}/g).join(":").toUpperCase();
+    // Strictly require deviceId to be a valid UUID v4
+    const uuidV4Regex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidV4Regex.test(deviceId)) {
+      throw new Error(
+        `Invalid deviceId: '${deviceId}'. Must be a valid UUID v4. No MAC/legacy fallback allowed.`
+      );
     }
 
-    // Look up device by macAddress
-    const device = await this.deviceRepository.findOne({
-      where: { macAddress },
+    // Find device by UUID
+    let device = await this.deviceRepository.findOne({
+      where: { id: deviceId },
     });
 
+    // If device not found, create it (auto-registration)
     if (!device) {
-      throw new NotFoundException("Device not found");
+      this.logger.warn(
+        `Device ${deviceId} not found, creating new device entry`
+      );
+
+      device = this.deviceRepository.create({
+        id: deviceId,
+        name: `PalPalette-${deviceId.substring(0, 8)}`,
+        type: "esp32c3",
+        status: "online",
+        isOnline: true,
+        isProvisioned: false,
+        lastSeenAt: new Date(),
+        user: null,
+        // Set fields from updateStatusDto
+        ipAddress: updateStatusDto.ipAddress,
+        macAddress: updateStatusDto.macAddress,
+        firmwareVersion: updateStatusDto.firmwareVersion,
+        wifiRSSI: updateStatusDto.wifiRSSI,
+        systemStats: updateStatusDto.systemStats || {
+          freeHeap: updateStatusDto.freeHeap,
+          uptime: updateStatusDto.uptime,
+          lastUpdate: new Date(),
+        },
+      });
+
+      return this.deviceRepository.save(device);
     }
 
     // Update provided fields
@@ -195,6 +224,39 @@ export class DeviceRegistrationService {
 
     if (updateStatusDto.ipAddress) {
       device.ipAddress = updateStatusDto.ipAddress;
+    }
+
+    if (updateStatusDto.macAddress) {
+      device.macAddress = updateStatusDto.macAddress;
+    }
+
+    if (updateStatusDto.firmwareVersion) {
+      device.firmwareVersion = updateStatusDto.firmwareVersion;
+    }
+
+    if (updateStatusDto.wifiRSSI !== undefined) {
+      device.wifiRSSI = updateStatusDto.wifiRSSI;
+    }
+
+    // Handle system stats (both object format and direct properties)
+    if (
+      updateStatusDto.systemStats ||
+      updateStatusDto.freeHeap !== undefined ||
+      updateStatusDto.uptime !== undefined
+    ) {
+      device.systemStats = {
+        ...device.systemStats,
+        ...updateStatusDto.systemStats,
+        freeHeap:
+          updateStatusDto.freeHeap ??
+          updateStatusDto.systemStats?.freeHeap ??
+          device.systemStats?.freeHeap,
+        uptime:
+          updateStatusDto.uptime ??
+          updateStatusDto.systemStats?.uptime ??
+          device.systemStats?.uptime,
+        lastUpdate: new Date(),
+      };
     }
 
     if (updateStatusDto.lastSeenAt) {

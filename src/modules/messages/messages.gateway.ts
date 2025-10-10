@@ -11,26 +11,65 @@ export class MessagesGateway {
   ) {}
 
   // Send color palette to specific device (only raw WebSocket needed)
-  async sendColorPaletteToDevice(deviceId: string, colorPalette: any) {
-    const delivered = this.deviceWebSocketService.sendColorPaletteToDevice(
-      deviceId,
-      colorPalette
-    );
+  async sendColorPaletteToDevice(
+    deviceId: string,
+    colorPalette: any
+  ): Promise<boolean> {
+    try {
+      // Validate input parameters
+      if (!deviceId || typeof deviceId !== "string") {
+        this.logger.error(
+          "Invalid deviceId provided to sendColorPaletteToDevice"
+        );
+        return false;
+      }
 
-    if (delivered) {
-      this.logger.log(
-        `Color palette sent to device ${deviceId} via Device WebSocket`
+      if (
+        !colorPalette ||
+        !colorPalette.colors ||
+        !Array.isArray(colorPalette.colors)
+      ) {
+        this.logger.error(
+          "Invalid colorPalette provided to sendColorPaletteToDevice"
+        );
+        return false;
+      }
+
+      const delivered =
+        await this.deviceWebSocketService.sendColorPaletteToDevice(
+          deviceId,
+          colorPalette
+        );
+
+      if (delivered) {
+        this.logger.log(
+          `Color palette sent to device ${deviceId} via Device WebSocket`
+        );
+      } else {
+        this.logger.warn(`Device ${deviceId} not connected or failed to send`);
+      }
+
+      return delivered;
+    } catch (error) {
+      this.logger.error(
+        `Failed to send color palette to device ${deviceId}: ${error.message}`,
+        error.stack
       );
-    } else {
-      this.logger.warn(`Device ${deviceId} not connected`);
+      return false;
     }
-
-    return delivered;
   }
 
   // Get connected devices
   getConnectedDevices(): string[] {
-    return this.deviceWebSocketService.getConnectedDevices();
+    try {
+      return this.deviceWebSocketService.getConnectedDevices();
+    } catch (error) {
+      this.logger.error(
+        `Failed to get connected devices: ${error.message}`,
+        error.stack
+      );
+      return [];
+    }
   }
 
   // Legacy method for mobile app notifications (now handled via HTTP REST API)

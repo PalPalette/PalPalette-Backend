@@ -81,22 +81,42 @@ export class DeviceWebSocketService implements OnApplicationBootstrap {
             const message = JSON.parse(data.toString());
             this.handleMessage(ws, message);
           } catch (error) {
-            this.logger.error(`JSON parse error: ${error.message}`);
-            ws.send(JSON.stringify({ error: "Invalid JSON" }));
+            this.logger.error(
+              `JSON parse error from ${clientIP}: ${error.message}`,
+              error.stack
+            );
+            // Send error response safely
+            if (ws.readyState === WebSocket.OPEN) {
+              try {
+                ws.send(
+                  JSON.stringify({
+                    error: "Invalid JSON format",
+                    timestamp: new Date().toISOString(),
+                  })
+                );
+              } catch (sendError) {
+                this.logger.error(
+                  `Failed to send error response to ${clientIP}: ${sendError.message}`
+                );
+              }
+            }
           }
         });
 
-        ws.on("close", () => {
+        ws.on("close", (code, reason) => {
           this.logger.log(
-            `ESP32 WebSocket client disconnected from: ${clientIP}`
+            `ESP32 WebSocket client disconnected from: ${clientIP} (code: ${code}, reason: ${reason})`
           );
           this.removeDeviceConnection(ws);
         });
 
         ws.on("error", (error) => {
           this.logger.error(
-            `WebSocket error from ${clientIP}: ${error.message}`
+            `WebSocket error from ${clientIP}: ${error.message}`,
+            error.stack
           );
+          // Cleanup connection on error
+          this.removeDeviceConnection(ws);
         });
       });
 
@@ -128,7 +148,14 @@ export class DeviceWebSocketService implements OnApplicationBootstrap {
     this.logger.log("Received message:", message);
 
     if (message.event === "registerDevice") {
-      const { deviceId } = message.data;
+      const {
+        deviceId,
+        macAddress,
+        ipAddress,
+        firmwareVersion,
+        isProvisioned,
+        pairingCode,
+      } = message.data;
 
       this.logger.log(`🔍 Device registration request for: ${deviceId}`);
 
@@ -148,26 +175,51 @@ export class DeviceWebSocketService implements OnApplicationBootstrap {
         return;
       }
 
-      // Check if device was previously connected
-      if (this.deviceConnections.has(deviceId)) {
-        this.logger.log(`Device was already registered, updating connection`);
+      try {
+        // First, ensure device exists in database
+        await this.ensureDeviceInDatabase({
+          id: deviceId,
+          macAddress,
+          ipAddress,
+          firmwareVersion,
+          isProvisioned,
+          pairingCode,
+        });
+
+        // Check if device was previously connected
+        if (this.deviceConnections.has(deviceId)) {
+          this.logger.log(`Device was already registered, updating connection`);
+        }
+
+        // Register WebSocket connection with database UUID
+        this.deviceConnections.set(deviceId, ws);
+        this.logger.log(
+          `✅ Device registered: ${deviceId} (Total connected: ${this.deviceConnections.size})`
+        );
+
+        // Send pending lighting configuration if any
+        await this.sendPendingLightingConfig(deviceId);
+
+        ws.send(
+          JSON.stringify({
+            event: "deviceRegistered",
+            data: { deviceId: deviceId, status: "registered" },
+          })
+        );
+      } catch (error) {
+        this.logger.error(
+          `❌ Failed to register device ${deviceId}: ${error.message}`
+        );
+        ws.send(
+          JSON.stringify({
+            event: "registrationError",
+            data: {
+              error: "Failed to register device in database",
+              details: error.message,
+            },
+          })
+        );
       }
-
-      // Register WebSocket connection with database UUID
-      this.deviceConnections.set(deviceId, ws);
-      this.logger.log(
-        `✅ Device registered: ${deviceId} (Total connected: ${this.deviceConnections.size})`
-      );
-
-      // Send pending lighting configuration if any
-      await this.sendPendingLightingConfig(deviceId);
-
-      ws.send(
-        JSON.stringify({
-          event: "deviceRegistered",
-          data: { deviceId: deviceId, status: "registered" },
-        })
-      );
     } else if (message.event === "completeSetup") {
       this.handleSetupCompletion(ws, message.data);
     } else if (message.event === "lightingSystemStatus") {
@@ -582,43 +634,83 @@ export class DeviceWebSocketService implements OnApplicationBootstrap {
   }
 
   sendColorPaletteToDevice(deviceId: string, palette: any): boolean {
-    this.logger.debug(
-      `Attempting to send color palette to device: ${deviceId}`
-    );
-    this.logger.debug(
-      `Currently connected devices: ${Array.from(
-        this.deviceConnections.keys()
-      ).join(", ")}`
-    );
-
-    // deviceId should be a database UUID
-    const ws = this.deviceConnections.get(deviceId);
-
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      const message = {
-        event: "colorPalette",
-        messageId: palette.messageId,
-        senderId: palette.senderId,
-        senderName: palette.senderName,
-        colors: palette.colors,
-        timestamp: palette.timestamp || Date.now(),
-      };
-
-      ws.send(JSON.stringify(message));
-      this.logger.log(`Color palette sent to device: ${deviceId}`);
-      return true;
-    }
-
-    if (ws) {
-      this.logger.warn(
-        `Device ${deviceId} WebSocket connection state: ${ws.readyState} (expected: ${WebSocket.OPEN})`
+    try {
+      this.logger.debug(
+        `Attempting to send color palette to device: ${deviceId}`
       );
-    } else {
-      this.logger.warn(`Device ${deviceId} not found in connections map`);
-    }
+      this.logger.debug(
+        `Currently connected devices: ${Array.from(
+          this.deviceConnections.keys()
+        ).join(", ")}`
+      );
 
-    this.logger.warn(`Device ${deviceId} not connected`);
-    return false;
+      // Validate input parameters
+      if (!deviceId || typeof deviceId !== "string") {
+        this.logger.error(
+          "Invalid deviceId provided to sendColorPaletteToDevice"
+        );
+        return false;
+      }
+
+      if (!palette || !palette.colors || !Array.isArray(palette.colors)) {
+        this.logger.error(
+          "Invalid palette provided to sendColorPaletteToDevice"
+        );
+        return false;
+      }
+
+      // deviceId should be a database UUID
+      const ws = this.deviceConnections.get(deviceId);
+
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        const message = {
+          event: "colorPalette",
+          messageId: palette.messageId,
+          senderId: palette.senderId,
+          senderName: palette.senderName,
+          colors: palette.colors,
+          timestamp: palette.timestamp || Date.now(),
+        };
+
+        try {
+          ws.send(JSON.stringify(message));
+          this.logger.log(`Color palette sent to device: ${deviceId}`);
+          return true;
+        } catch (sendError) {
+          this.logger.error(
+            `Failed to send message to device ${deviceId}: ${sendError.message}`,
+            sendError.stack
+          );
+          // Remove broken connection
+          this.removeDeviceConnection(ws);
+          return false;
+        }
+      }
+
+      if (ws) {
+        this.logger.warn(
+          `Device ${deviceId} WebSocket connection state: ${ws.readyState} (expected: ${WebSocket.OPEN})`
+        );
+        // Clean up non-open connections
+        if (
+          ws.readyState === WebSocket.CLOSED ||
+          ws.readyState === WebSocket.CLOSING
+        ) {
+          this.removeDeviceConnection(ws);
+        }
+      } else {
+        this.logger.warn(`Device ${deviceId} not found in connections map`);
+      }
+
+      this.logger.warn(`Device ${deviceId} not connected`);
+      return false;
+    } catch (error) {
+      this.logger.error(
+        `Unexpected error in sendColorPaletteToDevice for device ${deviceId}: ${error.message}`,
+        error.stack
+      );
+      return false;
+    }
   }
 
   notifyDeviceClaimed(deviceId: string, claimData: any): boolean {
@@ -794,5 +886,77 @@ export class DeviceWebSocketService implements OnApplicationBootstrap {
 
     this.logger.warn(`Device ${deviceId} not connected for factory reset`);
     return false;
+  }
+
+  /**
+   * Ensures device exists in database, creates it if it doesn't exist
+   */
+  private async ensureDeviceInDatabase(deviceData: {
+    id: string;
+    macAddress?: string;
+    ipAddress?: string;
+    firmwareVersion?: string;
+    isProvisioned?: boolean;
+    pairingCode?: string;
+  }): Promise<void> {
+    // Strictly require id to be a valid UUID v4
+    const uuidV4Regex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidV4Regex.test(deviceData.id)) {
+      throw new Error(
+        `Invalid device id: '${deviceData.id}'. Must be a valid UUID v4. No MAC/legacy fallback allowed.`
+      );
+    }
+    try {
+      // Check if device already exists
+      let existingDevice;
+      try {
+        existingDevice = await this.devicesService.findOne(deviceData.id);
+      } catch (error) {
+        // Device not found, will create new one
+        existingDevice = null;
+      }
+
+      if (existingDevice) {
+        // Update existing device with new information using repository directly
+        const deviceRepository = this.devicesService["deviceRepository"];
+        await deviceRepository.update(deviceData.id, {
+          ipAddress: deviceData.ipAddress,
+          firmwareVersion: deviceData.firmwareVersion,
+          isProvisioned: deviceData.isProvisioned,
+          pairingCode: deviceData.pairingCode,
+          status: "online",
+          isOnline: true,
+          lastSeenAt: new Date(),
+        });
+        this.logger.log(
+          `📝 Updated existing device in database: ${deviceData.id}`
+        );
+      } else {
+        // Create new device using repository directly
+        const deviceRepository = this.devicesService["deviceRepository"];
+        const newDevice = deviceRepository.create({
+          id: deviceData.id,
+          name: `PalPalette-${deviceData.id.substring(0, 8)}`,
+          type: "esp32c3",
+          macAddress: deviceData.macAddress,
+          ipAddress: deviceData.ipAddress,
+          firmwareVersion: deviceData.firmwareVersion,
+          isProvisioned: deviceData.isProvisioned || false,
+          pairingCode: deviceData.pairingCode,
+          status: "online",
+          isOnline: true,
+          lastSeenAt: new Date(),
+          user: null, // Will be set when user claims the device
+        });
+        await deviceRepository.save(newDevice);
+        this.logger.log(`🆕 Created new device in database: ${deviceData.id}`);
+      }
+    } catch (error) {
+      this.logger.error(
+        `❌ Failed to ensure device in database: ${error.message}`
+      );
+      throw error;
+    }
   }
 }
