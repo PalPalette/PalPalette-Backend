@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Delete,
+  Put,
   UseGuards,
   Request,
 } from "@nestjs/common";
@@ -30,6 +31,10 @@ import {
   UpdateColorPaletteDto,
   SendPaletteToFriendsDto,
 } from "./dto/color-palette.dto";
+import {
+  SetMessageTimeframeDto,
+  MessageTimeframeResponseDto,
+} from "./dto/message-timeframe.dto";
 
 @ApiTags("Users")
 @Controller("users")
@@ -276,6 +281,41 @@ export class UsersController {
       messageId,
       body.deviceId
     );
+  }
+
+  // Message timeframe endpoints - must come before :id route
+  @UseGuards(JwtAuthGuard)
+  @Put("message-timeframe")
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "Set user's message receiving timeframe" })
+  @ApiResponse({
+    status: 200,
+    description: "Message timeframe updated successfully",
+    type: MessageTimeframeResponseDto,
+  })
+  @ApiResponse({ status: 400, description: "Bad request - validation error" })
+  @ApiResponse({ status: 401, description: "Unauthorized" })
+  async setMessageTimeframe(
+    @Request() req,
+    @Body() dto: SetMessageTimeframeDto
+  ): Promise<MessageTimeframeResponseDto> {
+    return this.usersService.setMessageTimeframe(req.user.userId, dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get("message-timeframe")
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "Get user's message receiving timeframe" })
+  @ApiResponse({
+    status: 200,
+    description: "Message timeframe retrieved successfully",
+    type: MessageTimeframeResponseDto,
+  })
+  @ApiResponse({ status: 401, description: "Unauthorized" })
+  async getMessageTimeframe(
+    @Request() req
+  ): Promise<MessageTimeframeResponseDto> {
+    return this.usersService.getMessageTimeframe(req.user.userId);
   }
 
   // Generic user routes - must come AFTER specific routes

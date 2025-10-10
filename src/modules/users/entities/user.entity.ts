@@ -23,6 +23,12 @@ export class User {
   @Column()
   displayName: string;
 
+  @Column({ type: "time", nullable: true })
+  messageStartTime?: string; // Time when user wants to start receiving messages (e.g., "09:00:00")
+
+  @Column({ type: "time", nullable: true })
+  messageEndTime?: string; // Time when user wants to stop receiving messages (e.g., "22:00:00")
+
   @CreateDateColumn()
   createdAt: Date;
 
