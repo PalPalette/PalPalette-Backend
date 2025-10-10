@@ -12,10 +12,26 @@ export class LightingSystemConfigDto {
   @ApiProperty({
     example: "philips_hue",
     description: "Type of lighting system",
-    enum: ["nanoleaf", "wled", "ws2812", "philips_hue"],
+    enum: [
+      "nanoleaf",
+      "wled",
+      "ws2812",
+      "philips_hue",
+      "neopixel",
+      "addressable_led",
+      "generic_rgb",
+    ],
   })
   @IsString()
-  @IsIn(["nanoleaf", "wled", "ws2812", "philips_hue"])
+  @IsIn([
+    "nanoleaf",
+    "wled",
+    "ws2812",
+    "philips_hue",
+    "neopixel",
+    "addressable_led",
+    "generic_rgb",
+  ])
   lightingSystemType: string;
 
   @ApiPropertyOptional({

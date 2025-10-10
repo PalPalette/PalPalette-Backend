@@ -10,13 +10,11 @@ import { AuthModule } from "./modules/auth/auth.module";
 import { APP_GUARD, APP_FILTER } from "@nestjs/core";
 import { JwtAuthGuard } from "./modules/auth/jwt-auth.guard";
 import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
-// import { validateEnvironment } from "./config/validate-environment";
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      // validate: validateEnvironment, // Temporarily disabled
     }),
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],

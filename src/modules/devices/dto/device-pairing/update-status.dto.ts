@@ -80,4 +80,21 @@ export class UpdateStatusDto {
     uptime?: number;
     lastUpdate?: Date;
   };
+
+  // Direct properties for ESP32 compatibility
+  @ApiPropertyOptional({
+    example: 45000,
+    description: "Free heap memory in bytes (ESP32 direct property)",
+  })
+  @IsOptional()
+  @IsNumber()
+  freeHeap?: number;
+
+  @ApiPropertyOptional({
+    example: 3600,
+    description: "Device uptime in seconds (ESP32 direct property)",
+  })
+  @IsOptional()
+  @IsNumber()
+  uptime?: number;
 }
