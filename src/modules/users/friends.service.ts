@@ -11,6 +11,7 @@ import {
   SendFriendRequestDto,
   RespondToFriendRequestDto,
 } from "./dto/friendship.dto";
+import { Device } from "../devices/entities/device.entity";
 
 @Injectable()
 export class FriendsService {
@@ -19,6 +20,8 @@ export class FriendsService {
     private readonly friendshipRepository: Repository<Friendship>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    @InjectRepository(Device)
+    private readonly deviceRepository: Repository<Device>,
     @InjectDataSource()
     private readonly dataSource: DataSource
   ) {}
@@ -123,5 +126,34 @@ export class FriendsService {
       },
       relations: ["addressee"],
     });
+  }
+
+  async getFriendsWithDevices(userId: string): Promise<any[]> {
+    const friends = await this.getFriends(userId);
+    console.log(
+      "Fetched friends:",
+      friends.map((f) => ({ id: f.id, displayName: f.displayName }))
+    );
+    return Promise.all(
+      friends.map(async (friend) => {
+        const devices = await this.deviceRepository.find({
+          where: { userId: friend.id },
+        });
+        console.log(
+          `Devices for friend ${friend.id} (${friend.displayName}):`,
+          devices
+        );
+        return {
+          id: friend.id,
+          displayName: friend.displayName,
+          email: friend.email,
+          devices: devices.map((d) => ({
+            id: d.id,
+            name: d.name,
+            type: d.type,
+          })),
+        };
+      })
+    );
   }
 }

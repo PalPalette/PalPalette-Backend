@@ -16,6 +16,7 @@ import {
   ApiResponse,
   ApiBearerAuth,
   ApiParam,
+  ApiQuery,
 } from "@nestjs/swagger";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { UsersService } from "./users.service";
@@ -36,7 +37,6 @@ import {
   MessageTimeframeResponseDto,
 } from "./dto/message-timeframe.dto";
 import { FriendDto } from "./dto/friend.dto";
-import { DevicesService } from "../devices/devices.service";
 
 @ApiTags("Users")
 @Controller("users")
@@ -44,8 +44,7 @@ export class UsersController {
   constructor(
     private readonly usersService: UsersService,
     private readonly friendsService: FriendsService,
-    private readonly palettesService: ColorPalettesService,
-    private readonly devicesService: DevicesService
+    private readonly palettesService: ColorPalettesService
   ) {}
 
   @Post("register")
@@ -90,13 +89,21 @@ export class UsersController {
   @UseGuards(JwtAuthGuard)
   @Get("friends")
   @ApiBearerAuth()
-  @ApiOperation({ summary: "Get list of friends" })
+  @ApiOperation({ summary: "Get list of friends (optionally with devices)" })
   @ApiResponse({
     status: 200,
-    description: "List of friends retrieved successfully",
+    description:
+      "List of friends retrieved successfully. If includeDevices=true, each friend will include a devices array.",
     type: [FriendDto],
   })
   @ApiResponse({ status: 401, description: "Unauthorized" })
+  @ApiQuery({
+    name: "includeDevices",
+    required: false,
+    type: Boolean,
+    description:
+      "If true, each friend will include a devices array with their devices. If false or omitted, devices will be an empty array.",
+  })
   async getFriends(@Request() req): Promise<FriendDto[]> {
     // Check for ?includeDevices=true
     const includeDevices = req.query?.includeDevices === "true";
@@ -107,20 +114,11 @@ export class UsersController {
         id: friend.id,
         displayName: friend.displayName,
         email: friend.email,
+        devices: [], // Always present, even if empty
       }));
     }
     // With devices
-    return Promise.all(
-      friends.map(async (friend) => {
-        const devices = await this.devicesService.findUserDevices(friend.id);
-        return {
-          id: friend.id,
-          displayName: friend.displayName,
-          email: friend.email,
-          devices: devices.map((d) => ({ id: d.id, name: d.name, type: d.type })),
-        };
-      })
-    );
+    return this.friendsService.getFriendsWithDevices(req.user.userId);
   }
 
   @UseGuards(JwtAuthGuard)

@@ -461,104 +461,33 @@ export class DeviceWebSocketService implements OnApplicationBootstrap {
 
   private async handleLightingSystemStatus(ws: WebSocket, data: any) {
     this.logger.log("📊 Handling lighting system status update:", data);
-
     try {
-      const {
-        deviceId,
-        hasLightingSystem,
-        isReady,
-        systemType,
-        status,
-        capabilities,
-      } = data;
-
-      // Map lighting status to enum values
-      let mappedStatus = "unknown"; // default
-
-      if (status) {
-        const statusLower = status.toLowerCase();
-        if (
-          statusLower.includes("connected") ||
-          statusLower.includes("responding") ||
-          statusLower.includes("on") ||
-          statusLower === "working"
-        ) {
-          mappedStatus = "working";
-        } else if (
-          statusLower.includes("auth") &&
-          (statusLower.includes("no") || statusLower.includes("false"))
-        ) {
-          mappedStatus = "authentication_required";
-        } else if (
-          statusLower.includes("error") ||
-          statusLower.includes("failed") ||
-          statusLower.includes("disconnected") ||
-          statusLower.includes("not responding")
-        ) {
-          mappedStatus = "error";
-        } else if (statusLower === "unknown") {
-          mappedStatus = "unknown";
-        } else {
-          // If status contains any positive indicators, assume working
-          if (
-            statusLower.includes("ready") ||
-            statusLower.includes("yes") ||
-            statusLower.includes("success")
-          ) {
-            mappedStatus = "working";
-          } else {
-            mappedStatus = "error"; // default to error for unrecognized status
-          }
-        }
-      } else if (isReady !== undefined) {
-        mappedStatus = isReady ? "working" : "error";
+      const { deviceId } = data;
+      if (!deviceId) {
+        this.logger.error("No deviceId provided in lightingSystemStatus event");
+        return;
       }
-
-      // Update lighting system status via HTTP API
-      const updateData: any = {
-        lightingSystemConfigured: hasLightingSystem || false,
-        lightingSystemType: systemType || null,
-        lightingStatus: mappedStatus,
-      };
-
-      // Note: lightingCapabilities is not part of UpdateLightingSystemDto, so we don't include it
-
-      const response = await fetch(
-        `http://localhost:3000/devices/${deviceId}/lighting`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(updateData),
-        }
+      // Store the full status payload in lightingStatusDetails
+      const deviceRepository = this.devicesService["deviceRepository"];
+      await deviceRepository.update(deviceId, {
+        lightingStatusDetails: data,
+        lightingLastStatusUpdate: new Date(),
+        // Optionally, update the summary status field for quick filtering
+        lightingStatus: data.status || "unknown",
+      });
+      this.logger.log(
+        `✅ Lighting system status details updated for device: ${deviceId}`
       );
-
-      if (response.ok) {
-        this.logger.log(
-          `✅ Lighting system status updated for device: ${deviceId}`
-        );
-        this.logger.log(`🔧 System Type: ${systemType || "none"}`);
-        this.logger.log(
-          `📊 Raw Status: ${status || "none"}, Mapped: ${mappedStatus}`
-        );
-        this.logger.log(`🚦 Ready: ${isReady ? "Yes" : "No"}`);
-
-        // Send acknowledgment back to device
-        ws.send(
-          JSON.stringify({
-            event: "lightingStatusAck",
-            data: {
-              deviceId: deviceId,
-              status: "received",
-            },
-          })
-        );
-      } else {
-        this.logger.error(
-          `❌ Lighting system status update failed: ${await response.text()}`
-        );
-      }
+      // Send acknowledgment back to device
+      ws.send(
+        JSON.stringify({
+          event: "lightingStatusAck",
+          data: {
+            deviceId: deviceId,
+            status: "received",
+          },
+        })
+      );
     } catch (error) {
       this.logger.error(
         `❌ Lighting system status update error: ${error.message}`

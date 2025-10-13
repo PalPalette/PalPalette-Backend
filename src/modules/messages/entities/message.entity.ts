@@ -40,7 +40,7 @@ export class Message {
   @Column({ type: "json" })
   colors: any[];
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   imageUrl: string;
 
   @CreateDateColumn()

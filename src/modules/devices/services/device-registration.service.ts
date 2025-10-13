@@ -178,94 +178,158 @@ export class DeviceRegistrationService {
       );
     }
 
-    // Find device by UUID
-    let device = await this.deviceRepository.findOne({
-      where: { id: deviceId },
-    });
+    // Prepare system stats
+    const systemStats = updateStatusDto.systemStats || {
+      freeHeap: updateStatusDto.freeHeap,
+      uptime: updateStatusDto.uptime,
+      lastUpdate: new Date(),
+    };
 
-    // If device not found, create it (auto-registration)
-    if (!device) {
-      this.logger.warn(
-        `Device ${deviceId} not found, creating new device entry`
+    const currentTime = updateStatusDto.lastSeenAt
+      ? new Date(updateStatusDto.lastSeenAt)
+      : new Date();
+
+    try {
+      // Use raw SQL for upsert operation to handle race conditions properly
+      await this.deviceRepository.query(
+        `
+        INSERT INTO device (
+          id, name, type, status, "isOnline", "isProvisioned", "lastSeenAt",
+          "ipAddress", "macAddress", "firmwareVersion", "wifiRSSI", "systemStats",
+          "createdAt", "updatedAt"
+        ) VALUES (
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14
+        )
+        ON CONFLICT (id) DO UPDATE SET
+          status = EXCLUDED.status,
+          "isOnline" = EXCLUDED."isOnline",
+          "isProvisioned" = EXCLUDED."isProvisioned", 
+          "lastSeenAt" = EXCLUDED."lastSeenAt",
+          "ipAddress" = COALESCE(EXCLUDED."ipAddress", device."ipAddress"),
+          "macAddress" = COALESCE(EXCLUDED."macAddress", device."macAddress"),
+          "firmwareVersion" = COALESCE(EXCLUDED."firmwareVersion", device."firmwareVersion"),
+          "wifiRSSI" = COALESCE(EXCLUDED."wifiRSSI", device."wifiRSSI"),
+          "systemStats" = EXCLUDED."systemStats",
+          "updatedAt" = $14
+      `,
+        [
+          deviceId, // $1
+          `PalPalette-${deviceId.substring(0, 8)}`, // $2
+          "esp32c3", // $3
+          "online", // $4
+          updateStatusDto.isOnline ?? true, // $5
+          updateStatusDto.isProvisioned ?? false, // $6
+          currentTime, // $7
+          updateStatusDto.ipAddress, // $8
+          updateStatusDto.macAddress, // $9
+          updateStatusDto.firmwareVersion, // $10
+          updateStatusDto.wifiRSSI, // $11
+          JSON.stringify(systemStats), // $12
+          currentTime, // $13 (createdAt)
+          currentTime, // $14 (updatedAt)
+        ]
       );
 
-      device = this.deviceRepository.create({
-        id: deviceId,
-        name: `PalPalette-${deviceId.substring(0, 8)}`,
-        type: "esp32c3",
-        status: "online",
-        isOnline: true,
-        isProvisioned: false,
-        lastSeenAt: new Date(),
-        user: null,
-        // Set fields from updateStatusDto
-        ipAddress: updateStatusDto.ipAddress,
-        macAddress: updateStatusDto.macAddress,
-        firmwareVersion: updateStatusDto.firmwareVersion,
-        wifiRSSI: updateStatusDto.wifiRSSI,
-        systemStats: updateStatusDto.systemStats || {
-          freeHeap: updateStatusDto.freeHeap,
-          uptime: updateStatusDto.uptime,
-          lastUpdate: new Date(),
-        },
+      // Fetch the updated device
+      const device = await this.deviceRepository.findOne({
+        where: { id: deviceId },
       });
+
+      if (!device) {
+        throw new Error(`Failed to create or update device ${deviceId}`);
+      }
+
+      return device;
+    } catch (error) {
+      // If upsert fails, fall back to traditional find-and-update approach
+      this.logger.warn(
+        `Upsert failed for device ${deviceId}, falling back to traditional approach: ${error.message}`
+      );
+
+      let device = await this.deviceRepository.findOne({
+        where: { id: deviceId },
+      });
+
+      // If device still not found after upsert failure, create it manually
+      if (!device) {
+        this.logger.warn(
+          `Device ${deviceId} not found, creating new device entry`
+        );
+
+        device = this.deviceRepository.create({
+          id: deviceId,
+          name: `PalPalette-${deviceId.substring(0, 8)}`,
+          type: "esp32c3",
+          status: "online",
+          isOnline: true,
+          isProvisioned: false,
+          lastSeenAt: new Date(),
+          user: null,
+          // Set fields from updateStatusDto
+          ipAddress: updateStatusDto.ipAddress,
+          macAddress: updateStatusDto.macAddress,
+          firmwareVersion: updateStatusDto.firmwareVersion,
+          wifiRSSI: updateStatusDto.wifiRSSI,
+          systemStats: systemStats,
+        });
+
+        return this.deviceRepository.save(device);
+      }
+
+      // Update existing device
+      if (updateStatusDto.isOnline !== undefined) {
+        device.isOnline = updateStatusDto.isOnline;
+      }
+
+      if (updateStatusDto.isProvisioned !== undefined) {
+        device.isProvisioned = updateStatusDto.isProvisioned;
+      }
+
+      if (updateStatusDto.ipAddress) {
+        device.ipAddress = updateStatusDto.ipAddress;
+      }
+
+      if (updateStatusDto.macAddress) {
+        device.macAddress = updateStatusDto.macAddress;
+      }
+
+      if (updateStatusDto.firmwareVersion) {
+        device.firmwareVersion = updateStatusDto.firmwareVersion;
+      }
+
+      if (updateStatusDto.wifiRSSI !== undefined) {
+        device.wifiRSSI = updateStatusDto.wifiRSSI;
+      }
+
+      // Handle system stats (both object format and direct properties)
+      if (
+        updateStatusDto.systemStats ||
+        updateStatusDto.freeHeap !== undefined ||
+        updateStatusDto.uptime !== undefined
+      ) {
+        device.systemStats = {
+          ...device.systemStats,
+          ...updateStatusDto.systemStats,
+          freeHeap:
+            updateStatusDto.freeHeap ??
+            updateStatusDto.systemStats?.freeHeap ??
+            device.systemStats?.freeHeap,
+          uptime:
+            updateStatusDto.uptime ??
+            updateStatusDto.systemStats?.uptime ??
+            device.systemStats?.uptime,
+          lastUpdate: new Date(),
+        };
+      }
+
+      if (updateStatusDto.lastSeenAt) {
+        device.lastSeenAt = new Date(updateStatusDto.lastSeenAt);
+      } else {
+        device.lastSeenAt = new Date();
+      }
 
       return this.deviceRepository.save(device);
     }
-
-    // Update provided fields
-    if (updateStatusDto.isOnline !== undefined) {
-      device.isOnline = updateStatusDto.isOnline;
-    }
-
-    if (updateStatusDto.isProvisioned !== undefined) {
-      device.isProvisioned = updateStatusDto.isProvisioned;
-    }
-
-    if (updateStatusDto.ipAddress) {
-      device.ipAddress = updateStatusDto.ipAddress;
-    }
-
-    if (updateStatusDto.macAddress) {
-      device.macAddress = updateStatusDto.macAddress;
-    }
-
-    if (updateStatusDto.firmwareVersion) {
-      device.firmwareVersion = updateStatusDto.firmwareVersion;
-    }
-
-    if (updateStatusDto.wifiRSSI !== undefined) {
-      device.wifiRSSI = updateStatusDto.wifiRSSI;
-    }
-
-    // Handle system stats (both object format and direct properties)
-    if (
-      updateStatusDto.systemStats ||
-      updateStatusDto.freeHeap !== undefined ||
-      updateStatusDto.uptime !== undefined
-    ) {
-      device.systemStats = {
-        ...device.systemStats,
-        ...updateStatusDto.systemStats,
-        freeHeap:
-          updateStatusDto.freeHeap ??
-          updateStatusDto.systemStats?.freeHeap ??
-          device.systemStats?.freeHeap,
-        uptime:
-          updateStatusDto.uptime ??
-          updateStatusDto.systemStats?.uptime ??
-          device.systemStats?.uptime,
-        lastUpdate: new Date(),
-      };
-    }
-
-    if (updateStatusDto.lastSeenAt) {
-      device.lastSeenAt = new Date(updateStatusDto.lastSeenAt);
-    } else {
-      device.lastSeenAt = new Date();
-    }
-
-    return this.deviceRepository.save(device);
   }
 
   async getDeviceByMac(macAddress: string): Promise<Device | null> {

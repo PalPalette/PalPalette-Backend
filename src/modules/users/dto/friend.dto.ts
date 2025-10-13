@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { ApiProperty } from "@nestjs/swagger";
 
 export class FriendDeviceDto {
   @ApiProperty()
@@ -21,6 +21,6 @@ export class FriendDto {
   @ApiProperty()
   email: string;
 
-  @ApiPropertyOptional({ type: [FriendDeviceDto] })
-  devices?: FriendDeviceDto[];
+  @ApiProperty({ type: [FriendDeviceDto], default: [] })
+  devices: FriendDeviceDto[] = [];
 }

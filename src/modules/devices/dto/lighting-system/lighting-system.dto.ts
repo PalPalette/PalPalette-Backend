@@ -1,3 +1,9 @@
+export enum LightingStatus {
+  UNKNOWN = "unknown",
+  WORKING = "working",
+  ERROR = "error",
+  AUTHENTICATION_REQUIRED = "authentication_required",
+}
 import {
   IsString,
   IsOptional,
@@ -163,10 +169,17 @@ export class LightingSystemStatusDto {
   lightingSystemConfigured: boolean;
 
   @ApiProperty({
-    example: "working",
+    example: LightingStatus.WORKING,
     description: "Current status of the lighting system",
+    enum: LightingStatus,
   })
-  lightingStatus: string;
+  @IsIn([
+    LightingStatus.UNKNOWN,
+    LightingStatus.WORKING,
+    LightingStatus.ERROR,
+    LightingStatus.AUTHENTICATION_REQUIRED,
+  ])
+  lightingStatus: LightingStatus;
 
   @ApiPropertyOptional({
     example: "2023-01-01T00:00:00Z",
@@ -184,4 +197,10 @@ export class LightingSystemStatusDto {
     description: "Capabilities of the lighting system",
   })
   capabilities?: any;
+
+  @ApiPropertyOptional({
+    description:
+      "Full status details from the edge controller (lightingStatusDetails field)",
+  })
+  lightingStatusDetails?: any;
 }

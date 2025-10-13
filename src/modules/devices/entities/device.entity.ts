@@ -9,6 +9,7 @@ import {
 } from "typeorm";
 import { User } from "../../users/entities/user.entity";
 import { Message } from "../../messages/entities/message.entity";
+import { LightingStatus } from "../dto/lighting-system/lighting-system.dto";
 
 @Entity()
 export class Device {
@@ -26,6 +27,9 @@ export class Device {
     nullable: true,
   })
   user: User | null;
+
+  @Column({ nullable: true })
+  userId: string;
 
   @Column({ default: "unclaimed" })
   status: string; // unclaimed, claimed, online, offline, error
@@ -84,14 +88,22 @@ export class Device {
   @Column({ nullable: true })
   lightingLastTestAt: Date; // Last time lighting system was tested
 
-  @Column({ default: "unknown" })
-  lightingStatus: string; // unknown, working, error, authentication_required
+  @Column({
+    type: "enum",
+    enum: LightingStatus,
+    default: LightingStatus.UNKNOWN,
+  })
+  lightingStatus: LightingStatus; // unknown, working, error, authentication_required
 
   @Column({ type: "json", nullable: true })
   lightingCapabilities: any; // Lighting system capabilities
 
   @Column({ nullable: true })
   lightingLastStatusUpdate: Date; // Last time lighting status was updated
+
+  // Detailed status/info from edge controller about lighting system connection attempts
+  @Column({ type: "json", nullable: true })
+  lightingStatusDetails: any; // e.g. { status: 'authentication_required', details: 'Press button on Nanoleaf', lastTest: ... }
 
   @CreateDateColumn()
   createdAt: Date;

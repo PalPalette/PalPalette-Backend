@@ -12,6 +12,7 @@ import {
   LightingSystemConfigDto,
   UpdateLightingSystemDto,
   LightingSystemStatusDto,
+  LightingStatus,
 } from "./dto/lighting-system/lighting-system.dto";
 import { DeviceWebSocketService } from "../messages/device-websocket.service";
 
@@ -50,7 +51,7 @@ export class LightingSystemsService {
     device.lightingAuthToken = config.lightingAuthToken;
     device.lightingCustomConfig = config.lightingCustomConfig;
     device.lightingSystemConfigured = true;
-    device.lightingStatus = "unknown"; // Will be updated when device reports status
+    device.lightingStatus = LightingStatus.UNKNOWN; // Will be updated when device reports status
 
     const savedDevice = await this.deviceRepository.save(device);
 
@@ -123,6 +124,7 @@ export class LightingSystemsService {
         device.lightingSystemType
       ),
       capabilities: this.getSystemCapabilities(device.lightingSystemType),
+      lightingStatusDetails: device.lightingStatusDetails,
     };
   }
 
@@ -181,7 +183,7 @@ export class LightingSystemsService {
       colorOrder: "GRB",
     };
     device.lightingSystemConfigured = false;
-    device.lightingStatus = "unknown";
+    device.lightingStatus = LightingStatus.UNKNOWN;
     device.lightingLastTestAt = null;
 
     return this.deviceRepository.save(device);

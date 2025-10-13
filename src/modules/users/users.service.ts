@@ -31,6 +31,11 @@ export class UsersService {
   async register(registerUserDto: RegisterUserDto): Promise<User> {
     const { email, password, displayName } = registerUserDto;
 
+    // Set default message timeframe if not provided
+    const messageStartTime =
+      (registerUserDto as any).messageStartTime || "00:00";
+    const messageEndTime = (registerUserDto as any).messageEndTime || "23:59";
+
     // Check if user already exists
     const existingUser = await this.findByEmail(email);
     if (existingUser) {
@@ -42,6 +47,8 @@ export class UsersService {
       email,
       passwordHash: hashedPassword,
       displayName,
+      messageStartTime,
+      messageEndTime,
     });
     return this.userRepository.save(user);
   }

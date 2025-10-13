@@ -10,7 +10,6 @@ import { ColorPalette } from "./entities/color-palette.entity";
 import { Message } from "../messages/entities/message.entity";
 import { Device } from "../devices/entities/device.entity";
 import { MessagesModule } from "../messages/messages.module";
-import { DevicesService } from "../devices/devices.service";
 
 @Module({
   imports: [
@@ -18,7 +17,7 @@ import { DevicesService } from "../devices/devices.service";
     forwardRef(() => MessagesModule),
   ],
   controllers: [UsersController],
-  providers: [UsersService, FriendsService, ColorPalettesService, DevicesService],
+  providers: [UsersService, FriendsService, ColorPalettesService],
   exports: [UsersService, FriendsService, ColorPalettesService],
 })
 export class UsersModule {}
