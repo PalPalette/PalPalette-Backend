@@ -498,6 +498,28 @@ export class DeviceWebSocketService implements OnApplicationBootstrap {
   private async handleLightingSystemTest(ws: WebSocket, data: any) {
     this.logger.log("Handling lighting system test result:", data);
 
+    // Validate deviceId: must be a string that only contains alphanumeric, dash, or underscore and is between 1 and 64 chars
+    if (
+      !data.deviceId ||
+      typeof data.deviceId !== "string" ||
+      !/^[A-Za-z0-9_-]{1,64}$/.test(data.deviceId)
+    ) {
+      this.logger.error(
+        `Invalid deviceId in lightingSystemTest: ${JSON.stringify(data.deviceId)}`
+      );
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(
+          JSON.stringify({
+            event: "lightingSystemTestError",
+            data: {
+              error: "Invalid deviceId provided",
+            },
+          })
+        );
+      }
+      return;
+    }
+
     try {
       // Update lighting system test result via HTTP API
       const response = await fetch(
