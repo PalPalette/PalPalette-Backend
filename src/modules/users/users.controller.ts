@@ -16,6 +16,7 @@ import {
   ApiResponse,
   ApiBearerAuth,
   ApiParam,
+  ApiQuery,
 } from "@nestjs/swagger";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { UsersService } from "./users.service";
@@ -35,6 +36,7 @@ import {
   SetMessageTimeframeDto,
   MessageTimeframeResponseDto,
 } from "./dto/message-timeframe.dto";
+import { FriendDto } from "./dto/friend.dto";
 
 @ApiTags("Users")
 @Controller("users")
@@ -87,14 +89,36 @@ export class UsersController {
   @UseGuards(JwtAuthGuard)
   @Get("friends")
   @ApiBearerAuth()
-  @ApiOperation({ summary: "Get list of friends" })
+  @ApiOperation({ summary: "Get list of friends (optionally with devices)" })
   @ApiResponse({
     status: 200,
-    description: "List of friends retrieved successfully",
+    description:
+      "List of friends retrieved successfully. If includeDevices=true, each friend will include a devices array.",
+    type: [FriendDto],
   })
   @ApiResponse({ status: 401, description: "Unauthorized" })
-  async getFriends(@Request() req) {
-    return this.friendsService.getFriends(req.user.userId);
+  @ApiQuery({
+    name: "includeDevices",
+    required: false,
+    type: Boolean,
+    description:
+      "If true, each friend will include a devices array with their devices. If false or omitted, devices will be an empty array.",
+  })
+  async getFriends(@Request() req): Promise<FriendDto[]> {
+    // Check for ?includeDevices=true
+    const includeDevices = req.query?.includeDevices === "true";
+    const friends = await this.friendsService.getFriends(req.user.userId);
+    if (!includeDevices) {
+      // Only return safe fields
+      return friends.map((friend) => ({
+        id: friend.id,
+        displayName: friend.displayName,
+        email: friend.email,
+        devices: [], // Always present, even if empty
+      }));
+    }
+    // With devices
+    return this.friendsService.getFriendsWithDevices(req.user.userId);
   }
 
   @UseGuards(JwtAuthGuard)

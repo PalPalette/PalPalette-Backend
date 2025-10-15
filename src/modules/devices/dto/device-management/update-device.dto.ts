@@ -6,6 +6,7 @@ import {
   IsObject,
   IsIn,
 } from "class-validator";
+import { LightingStatus } from "../lighting-system/lighting-system.dto";
 
 export class UpdateDeviceDto {
   @IsString()
@@ -45,8 +46,12 @@ export class UpdateDeviceDto {
   @IsOptional()
   lightingSystemConfigured?: boolean;
 
-  @IsString()
   @IsOptional()
-  @IsIn(["unknown", "working", "error", "authentication_required"])
-  lightingStatus?: string;
+  @IsIn([
+    LightingStatus.UNKNOWN,
+    LightingStatus.WORKING,
+    LightingStatus.ERROR,
+    LightingStatus.AUTHENTICATION_REQUIRED,
+  ])
+  lightingStatus?: LightingStatus;
 }
