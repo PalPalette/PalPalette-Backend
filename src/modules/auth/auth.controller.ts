@@ -125,15 +125,6 @@ export class AuthController {
   @ApiOperation({ summary: "Revoke access for a specific device" })
   @ApiResponse({ status: 200, description: "Device access revoked" })
   @ApiResponse({ status: 401, description: "Unauthorized" })
-  @ApiBody({
-    schema: {
-      type: "object",
-      properties: {
-        device_name: { type: "string" },
-      },
-      required: ["device_name"],
-    },
-  })
   async revokeDevice(@Request() req, @Body() body: { device_name: string }) {
     await this.authService.revokeDeviceAccess(
       req.user.userId,
@@ -146,7 +137,37 @@ export class AuthController {
   @Post("sessions")
   @ApiBearerAuth()
   @ApiOperation({ summary: "Get active sessions for the current user" })
-  @ApiResponse({ status: 200, description: "Active sessions retrieved" })
+  @ApiResponse({
+    status: 200,
+    description: "Active sessions retrieved",
+    schema: {
+      type: "object",
+      properties: {
+        sessions: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              id: { type: "string", example: "session-uuid" },
+              deviceName: { type: "string", example: "My iPhone" },
+              ipAddress: { type: "string", example: "192.168.1.100" },
+              userAgent: { type: "string", example: "Mozilla/5.0..." },
+              createdAt: {
+                type: "string",
+                format: "date-time",
+                example: "2025-10-21T12:00:00Z",
+              },
+              lastUsedAt: {
+                type: "string",
+                format: "date-time",
+                example: "2025-10-21T14:30:00Z",
+              },
+            },
+          },
+        },
+      },
+    },
+  })
   @ApiResponse({ status: 401, description: "Unauthorized" })
   async getActiveSessions(@Request() req) {
     const sessions = await this.authService.getActiveSessions(req.user.userId);

@@ -99,4 +99,74 @@ export class MessagesService {
       take: limit,
     });
   }
+
+  async replayMessage(
+    messageId: string,
+    userId: string
+  ): Promise<{
+    success: boolean;
+    message: string;
+    deliveredToDevices?: string[];
+  }> {
+    // Find the message
+    const message = await this.messageRepository.findOne({
+      where: { id: messageId },
+      relations: ["sender", "recipient", "device"],
+    });
+
+    if (!message) {
+      throw new Error("Message not found");
+    }
+
+    // Verify that the user is the recipient of this message
+    if (message.recipient.id !== userId) {
+      throw new Error("Unauthorized: You can only replay messages sent to you");
+    }
+
+    // Find all devices belonging to the user
+    const userDevices = await this.deviceRepository.find({
+      where: { user: { id: userId } },
+    });
+
+    if (userDevices.length === 0) {
+      return {
+        success: false,
+        message: "No devices found for this user",
+      };
+    }
+
+    // Send the message to all user's devices (bypassing timeframe check)
+    const deliveredDevices: string[] = [];
+
+    for (const device of userDevices) {
+      const delivered = await this.messagesGateway.sendColorPaletteToDevice(
+        device.id,
+        {
+          colors: message.colors,
+          messageId: message.id,
+          senderId: message.sender.id,
+          senderName: message.sender?.displayName || message.sender?.email,
+          timestamp: message.sentAt,
+        }
+      );
+
+      if (delivered) {
+        deliveredDevices.push(device.id);
+      }
+    }
+
+    if (deliveredDevices.length > 0) {
+      return {
+        success: true,
+        message: `Message replayed successfully to ${deliveredDevices.length} device(s)`,
+        deliveredToDevices: deliveredDevices,
+      };
+    } else {
+      return {
+        success: false,
+        message:
+          "Failed to replay message - no devices are currently connected",
+      };
+    }
+  }
 }
