@@ -36,6 +36,7 @@ import {
   SetMessageTimeframeDto,
   MessageTimeframeResponseDto,
 } from "./dto/message-timeframe.dto";
+import { ReplayMessageOnDeviceDto } from "./dto/replay-message.dto";
 import { FriendDto } from "./dto/friend.dto";
 
 @ApiTags("Users")
@@ -298,7 +299,7 @@ export class UsersController {
   async replayMessage(
     @Request() req,
     @Param("messageId") messageId: string,
-    @Body() body: { deviceId: string }
+    @Body() body: ReplayMessageOnDeviceDto
   ) {
     return this.usersService.replayMessageOnDevice(
       req.user.userId,

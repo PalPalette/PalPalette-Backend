@@ -23,6 +23,13 @@ import { RegisterDeviceDto } from "./dto/device-pairing/register-device.dto";
 import { ClaimByCodeDto } from "./dto/device-pairing/claim-by-code.dto";
 import { UpdateStatusDto } from "./dto/device-pairing/update-status.dto";
 import {
+  DiscoverUnpairedDevicesResponseDto,
+  PairingCodeResponseDto,
+  DevicePairingInfoDto,
+  ResetDeviceResponseDto,
+  SupportedLightingSystemsResponseDto,
+} from "./dto/device-pairing/device-pairing-response.dto";
+import {
   LightingSystemConfigDto,
   UpdateLightingSystemDto,
 } from "./dto/lighting-system/lighting-system.dto";
@@ -68,6 +75,7 @@ export class DevicesController {
   @ApiResponse({
     status: 200,
     description: "Pairing code retrieved successfully",
+    type: PairingCodeResponseDto,
   })
   @ApiResponse({ status: 404, description: "Device not found" })
   async getPairingCode(@Param("deviceId") deviceId: string) {
@@ -111,7 +119,11 @@ export class DevicesController {
   @ApiBearerAuth()
   @ApiOperation({ summary: "Reset device to unclaimed state" })
   @ApiParam({ name: "id", description: "Device ID", example: "device-uuid" })
-  @ApiResponse({ status: 200, description: "Device reset successfully" })
+  @ApiResponse({
+    status: 200,
+    description: "Device reset successfully",
+    type: ResetDeviceResponseDto,
+  })
   @ApiResponse({ status: 401, description: "Unauthorized" })
   @ApiResponse({ status: 403, description: "Forbidden - not device owner" })
   @ApiResponse({ status: 404, description: "Device not found" })
@@ -160,6 +172,7 @@ export class DevicesController {
   @ApiResponse({
     status: 200,
     description: "List of discoverable unpaired devices",
+    type: DiscoverUnpairedDevicesResponseDto,
   })
   async discoverUnpairedDevices() {
     console.log("🔍 Discovering unpaired devices...");
@@ -221,6 +234,22 @@ export class DevicesController {
 
   @Public()
   @Get(":deviceId/pairing-info")
+  @ApiOperation({ summary: "Get pairing information for a specific device" })
+  @ApiParam({
+    name: "deviceId",
+    description: "Device ID",
+    example: "device-uuid",
+  })
+  @ApiResponse({
+    status: 200,
+    description: "Device pairing information retrieved successfully",
+    type: DevicePairingInfoDto,
+  })
+  @ApiResponse({ status: 404, description: "Device not found" })
+  @ApiResponse({
+    status: 400,
+    description: "Device is already claimed",
+  })
   async getDevicePairingInfo(@Param("deviceId") deviceId: string) {
     const device = await this.devicesService.findOne(deviceId);
 
@@ -322,7 +351,17 @@ export class DevicesController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @Get(":id/lighting/status")
+  @ApiOperation({ summary: "Get lighting system status for a device" })
+  @ApiParam({ name: "id", description: "Device ID", example: "device-uuid" })
+  @ApiResponse({
+    status: 200,
+    description: "Lighting system status retrieved successfully",
+  })
+  @ApiResponse({ status: 401, description: "Unauthorized" })
+  @ApiResponse({ status: 403, description: "Forbidden - not device owner" })
+  @ApiResponse({ status: 404, description: "Device not found" })
   async getLightingSystemStatus(@Param("id") deviceId: string, @Request() req) {
     // Verify device belongs to user
     const device = await this.devicesService.findOne(deviceId);
@@ -334,7 +373,17 @@ export class DevicesController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @Delete(":id/lighting")
+  @ApiOperation({ summary: "Reset/clear lighting system configuration" })
+  @ApiParam({ name: "id", description: "Device ID", example: "device-uuid" })
+  @ApiResponse({
+    status: 200,
+    description: "Lighting system configuration cleared successfully",
+  })
+  @ApiResponse({ status: 401, description: "Unauthorized" })
+  @ApiResponse({ status: 403, description: "Forbidden - not device owner" })
+  @ApiResponse({ status: 404, description: "Device not found" })
   async resetLightingSystem(@Param("id") deviceId: string, @Request() req) {
     // Verify device belongs to user
     const device = await this.devicesService.findOne(deviceId);
@@ -378,14 +427,18 @@ export class DevicesController {
 
       // TODO: Implement real-time notification delivery to user's mobile app
       // For now, we'll log the notification and return success
-      console.log("User notification for device %s:", notificationDto.deviceId, {
-        action: notificationDto.action,
-        message: notificationDto.message,
-        userId: device.user.id,
-        userEmail: device.user.email,
-        pairingCode: notificationDto.pairingCode,
-        additionalData: notificationDto.additionalData,
-      });
+      console.log(
+        "User notification for device %s:",
+        notificationDto.deviceId,
+        {
+          action: notificationDto.action,
+          message: notificationDto.message,
+          userId: device.user.id,
+          userEmail: device.user.email,
+          pairingCode: notificationDto.pairingCode,
+          additionalData: notificationDto.additionalData,
+        }
+      );
 
       return {
         notificationId,
@@ -403,7 +456,17 @@ export class DevicesController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @Get("my-devices/lighting-systems")
+  @ApiOperation({
+    summary: "Get lighting system configurations for all user's devices",
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      "Lighting system configurations retrieved successfully for all user devices",
+  })
+  @ApiResponse({ status: 401, description: "Unauthorized" })
   async getMyDevicesLightingSystems(@Request() req) {
     return this.lightingSystemsService.getUserDevicesLightingSystems(
       req.user.userId
@@ -412,6 +475,14 @@ export class DevicesController {
 
   @Get("lighting/supported-systems")
   @Public()
+  @ApiOperation({
+    summary: "Get list of supported lighting systems and their capabilities",
+  })
+  @ApiResponse({
+    status: 200,
+    description: "Supported lighting systems and capabilities retrieved",
+    type: SupportedLightingSystemsResponseDto,
+  })
   async getSupportedLightingSystems() {
     return {
       systems: this.lightingSystemsService.getSupportedLightingSystems(),
@@ -426,6 +497,19 @@ export class DevicesController {
 
   @Get("lighting/:systemType/default-config")
   @Public()
+  @ApiOperation({
+    summary: "Get default configuration for a specific lighting system type",
+  })
+  @ApiParam({
+    name: "systemType",
+    description: "Type of lighting system",
+    example: "philips_hue",
+    enum: ["nanoleaf", "wled", "ws2812", "philips_hue"],
+  })
+  @ApiResponse({
+    status: 200,
+    description: "Default configuration retrieved successfully",
+  })
   async getDefaultLightingConfig(@Param("systemType") systemType: string) {
     return this.lightingSystemsService.getDefaultLightingConfig(systemType);
   }
