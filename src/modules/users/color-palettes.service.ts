@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Inject,
   forwardRef,
+  Logger,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
@@ -19,9 +20,13 @@ import {
 import { FriendsService } from "./friends.service";
 import { UsersService } from "./users.service";
 import { MessagesGateway } from "../messages/messages.gateway";
+import { PushService } from "../push/push.service";
+import { MessagePushData } from "../push/dto/push-notification-payload.dto";
 
 @Injectable()
 export class ColorPalettesService {
+  private readonly logger = new Logger(ColorPalettesService.name);
+
   constructor(
     @InjectRepository(ColorPalette)
     private readonly paletteRepository: Repository<ColorPalette>,
@@ -35,7 +40,8 @@ export class ColorPalettesService {
     @Inject(forwardRef(() => UsersService))
     private readonly usersService: UsersService,
     @Inject(forwardRef(() => MessagesGateway))
-    private readonly messagesGateway: MessagesGateway
+    private readonly messagesGateway: MessagesGateway,
+    private readonly pushService: PushService
   ) {}
 
   async create(
@@ -204,14 +210,45 @@ export class ColorPalettesService {
           }
         }
 
-        // Send notification to user's mobile app
-        await this.messagesGateway.sendMessageNotificationToUser(friendId, {
-          id: savedMessage.id,
-          senderId: userId,
-          senderName: sender?.displayName || sender?.email,
-          colors: savedMessage.colors,
-          sentAt: savedMessage.sentAt,
-        });
+        // Send push notification to recipient's mobile app
+        try {
+          const senderName = sender?.displayName || sender?.email || "Someone";
+          const previewColors = savedMessage.colors.slice(0, 3); // First 3 colors
+
+          const pushData: MessagePushData = {
+            type: "message",
+            messageId: savedMessage.id,
+            senderId: userId,
+            senderName,
+            timestamp: savedMessage.sentAt.toISOString(),
+            previewColors,
+          };
+
+          // Customize message based on whether device is online
+          const pushBody = isWithinTimeframe
+            ? "You received a color palette message"
+            : "You received a color palette message. Your device is offline - tap to view and replay.";
+
+          await this.pushService.sendToUser(
+            friendId,
+            {
+              title: `New message from ${senderName}`,
+              body: pushBody,
+              data: pushData,
+            },
+            { bypassTimeframe: true, priority: "high" }
+          );
+
+          this.logger.log(
+            `Push notification sent for message ${savedMessage.id} to user ${friendId} (timeframe: ${isWithinTimeframe ? "active" : "inactive"})`
+          );
+        } catch (error) {
+          // Don't fail message sending if push fails
+          this.logger.error(
+            `Failed to send push notification for message ${savedMessage.id}: ${error.message}`,
+            error.stack
+          );
+        }
 
         return savedMessage;
       })

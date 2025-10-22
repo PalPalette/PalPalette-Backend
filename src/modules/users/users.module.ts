@@ -10,11 +10,13 @@ import { ColorPalette } from "./entities/color-palette.entity";
 import { Message } from "../messages/entities/message.entity";
 import { Device } from "../devices/entities/device.entity";
 import { MessagesModule } from "../messages/messages.module";
+import { PushModule } from "../push/push.module";
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([User, Friendship, ColorPalette, Message, Device]),
     forwardRef(() => MessagesModule),
+    PushModule,
   ],
   controllers: [UsersController],
   providers: [UsersService, FriendsService, ColorPalettesService],

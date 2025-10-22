@@ -8,11 +8,13 @@ import { Message } from "./entities/message.entity";
 import { User } from "../users/entities/user.entity";
 import { Device } from "../devices/entities/device.entity";
 import { DevicesModule } from "../devices/devices.module";
+import { PushModule } from "../push/push.module";
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Message, User, Device]),
     forwardRef(() => DevicesModule),
+    PushModule,
   ],
   providers: [MessagesService, MessagesGateway, DeviceWebSocketService],
   controllers: [MessagesController],

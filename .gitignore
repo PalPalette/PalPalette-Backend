@@ -126,3 +126,6 @@ credentials/
 LOCAL_DEVELOPMENT.md
 SEAMLESS_AUTH_IMPLEMENTATION.md
 brief.md
+
+firebase-config.json
+serviceAccountKey.json
