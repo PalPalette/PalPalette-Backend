@@ -1,4 +1,4 @@
-import { Injectable, Inject, forwardRef } from "@nestjs/common";
+import { Injectable, Inject, forwardRef, Logger } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { Message } from "./entities/message.entity";
@@ -6,9 +6,13 @@ import { CreateMessageDto } from "./dto/create-message.dto";
 import { User } from "../users/entities/user.entity";
 import { Device } from "../devices/entities/device.entity";
 import { MessagesGateway } from "./messages.gateway";
+import { PushService } from "../push/push.service";
+import { MessagePushData } from "../push/dto/push-notification-payload.dto";
 
 @Injectable()
 export class MessagesService {
+  private readonly logger = new Logger(MessagesService.name);
+
   constructor(
     @InjectRepository(Message)
     private readonly messageRepository: Repository<Message>,
@@ -17,7 +21,8 @@ export class MessagesService {
     @InjectRepository(Device)
     private readonly deviceRepository: Repository<Device>,
     @Inject(forwardRef(() => MessagesGateway))
-    private readonly messagesGateway: MessagesGateway
+    private readonly messagesGateway: MessagesGateway,
+    private readonly pushService: PushService
   ) {}
 
   async create(createMessageDto: CreateMessageDto): Promise<Message> {
@@ -40,6 +45,60 @@ export class MessagesService {
     });
     const savedMessage = await this.messageRepository.save(message);
     this.messagesGateway.emitNewMessage(savedMessage);
+
+    // Try to deliver to device via WebSocket
+    const deliveredToDevice =
+      await this.messagesGateway.sendColorPaletteToDevice(device.id, {
+        colors: createMessageDto.colors,
+        messageId: savedMessage.id,
+        senderId: sender.id,
+        senderName: sender.displayName || sender.email,
+        timestamp: savedMessage.sentAt,
+      });
+
+    // Send push notification to recipient
+    // Push bypasses timeframe so user can be notified even during quiet hours
+    try {
+      const senderName = sender.displayName || sender.email;
+      const previewColors = createMessageDto.colors.slice(0, 3); // First 3 colors
+
+      const pushData: MessagePushData = {
+        type: "message",
+        messageId: savedMessage.id,
+        senderId: sender.id,
+        senderName,
+        timestamp: savedMessage.sentAt.toISOString(),
+        previewColors,
+      };
+
+      // Customize message based on device connectivity
+      const pushBody = deliveredToDevice
+        ? "You received a color palette message"
+        : "You received a color palette message. Your device is offline - tap to view and replay.";
+
+      await this.pushService.sendToUser(
+        recipient.id,
+        {
+          title: `New message from ${senderName}`,
+          body: pushBody,
+          data: pushData,
+        },
+        { bypassTimeframe: true, priority: "high" }
+      );
+
+      this.logger.log(
+        `Push notification sent for message ${savedMessage.id} to user ${
+          recipient.id
+        } (device ${deliveredToDevice ? "online" : "offline"})`
+      );
+    } catch (error) {
+      // Don't fail message creation if push fails
+      this.logger.error(
+        `Failed to send push notification for message ${savedMessage.id}: ${error.message}`,
+        error.stack
+      );
+    }
+
     return savedMessage;
   }
 

@@ -2,6 +2,7 @@ import {
   Injectable,
   BadRequestException,
   NotFoundException,
+  Logger,
 } from "@nestjs/common";
 import { InjectRepository, InjectDataSource } from "@nestjs/typeorm";
 import { Repository, DataSource } from "typeorm";
@@ -12,9 +13,13 @@ import {
   RespondToFriendRequestDto,
 } from "./dto/friendship.dto";
 import { Device } from "../devices/entities/device.entity";
+import { PushService } from "../push/push.service";
+import { FriendInvitePushData } from "../push/dto/push-notification-payload.dto";
 
 @Injectable()
 export class FriendsService {
+  private readonly logger = new Logger(FriendsService.name);
+
   constructor(
     @InjectRepository(Friendship)
     private readonly friendshipRepository: Repository<Friendship>,
@@ -23,14 +28,15 @@ export class FriendsService {
     @InjectRepository(Device)
     private readonly deviceRepository: Repository<Device>,
     @InjectDataSource()
-    private readonly dataSource: DataSource
+    private readonly dataSource: DataSource,
+    private readonly pushService: PushService
   ) {}
 
   async sendFriendRequest(
     requesterId: string,
     dto: SendFriendRequestDto
   ): Promise<Friendship> {
-    return this.dataSource.transaction(async (manager) => {
+    const friendship = await this.dataSource.transaction(async (manager) => {
       // Find the user to send request to
       const addressee = await manager.findOne(User, {
         where: { email: dto.email },
@@ -63,6 +69,46 @@ export class FriendsService {
 
       return manager.save(friendship);
     });
+
+    // Send push notification to the addressee
+    try {
+      const requester = await this.userRepository.findOne({
+        where: { id: requesterId },
+      });
+
+      if (requester) {
+        const requesterName = requester.displayName || requester.email;
+
+        const pushData: FriendInvitePushData = {
+          type: "friend_invite",
+          inviterId: requester.id,
+          inviterName: requesterName,
+          inviteId: friendship.id,
+        };
+
+        await this.pushService.sendToUser(
+          friendship.addresseeId,
+          {
+            title: "New Friend Request",
+            body: `${requesterName} wants to be your friend`,
+            data: pushData,
+          },
+          { bypassTimeframe: true, priority: "high" }
+        );
+
+        this.logger.log(
+          `Push notification sent for friend request ${friendship.id} to user ${friendship.addresseeId}`
+        );
+      }
+    } catch (error) {
+      // Don't fail the friend request if push fails
+      this.logger.error(
+        `Failed to send push notification for friend request ${friendship.id}: ${error.message}`,
+        error.stack
+      );
+    }
+
+    return friendship;
   }
 
   async respondToFriendRequest(

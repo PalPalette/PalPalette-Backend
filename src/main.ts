@@ -56,6 +56,10 @@ async function bootstrap() {
     .addTag("Users", "User management and social features")
     .addTag("Devices", "Device registration, pairing and management")
     .addTag("Messages", "Real-time messaging and color palette sharing")
+    .addTag(
+      "Push Notifications",
+      "Push notification token registration and management"
+    )
     .build();
 
   await SwaggerModule.loadPluginMetadata(metadata); // <-- here

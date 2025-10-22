@@ -7,6 +7,7 @@ import { UsersModule } from "./modules/users/users.module";
 import { DevicesModule } from "./modules/devices/devices.module";
 import { MessagesModule } from "./modules/messages/messages.module";
 import { AuthModule } from "./modules/auth/auth.module";
+import { PushModule } from "./modules/push/push.module";
 import { APP_GUARD, APP_FILTER } from "@nestjs/core";
 import { JwtAuthGuard } from "./modules/auth/jwt-auth.guard";
 import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
@@ -57,6 +58,7 @@ import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
     DevicesModule,
     MessagesModule,
     AuthModule,
+    PushModule,
   ],
   providers: [
     {
