@@ -6,8 +6,10 @@ This document outlines the complete registration and setup process for PalPalett
 
 ## Base URLs
 
-- **HTTP API**: `http://YOUR_BACKEND_IP:3000`
-- **WebSocket**: `ws://YOUR_BACKEND_IP:3001/ws`
+- **HTTP API (Development)**: `http://YOUR_BACKEND_IP:3000`
+- **HTTPS API (Production)**: `https://your-domain.com/api`
+- **WebSocket (Development)**: `ws://YOUR_BACKEND_IP:3001/ws`
+- **WebSocket Secure (Production)**: `wss://your-domain.com:3001/ws`
 
 ---
 
@@ -17,7 +19,7 @@ This document outlines the complete registration and setup process for PalPalett
 
 When your device boots up and connects to WiFi, immediately register with the backend:
 
-**Endpoint**: `POST /devices/register`  
+**Endpoint**: `POST /devices/register` (HTTP) or `POST /api/devices/register` (HTTPS)  
 **Public**: Yes (no authentication required)
 
 **Payload**:

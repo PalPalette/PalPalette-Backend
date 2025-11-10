@@ -8,6 +8,7 @@ import {
 import * as WebSocket from "ws";
 import { createServer } from "http";
 import { DevicesService } from "../devices/devices.service";
+import { ApiUrlService } from "../../common/services/api-url.service";
 
 @Injectable()
 export class DeviceWebSocketService implements OnApplicationBootstrap {
@@ -18,7 +19,8 @@ export class DeviceWebSocketService implements OnApplicationBootstrap {
 
   constructor(
     @Inject(forwardRef(() => DevicesService))
-    private readonly devicesService: DevicesService
+    private readonly devicesService: DevicesService,
+    private readonly apiUrlService: ApiUrlService
   ) {}
 
   async onApplicationBootstrap() {
@@ -258,7 +260,7 @@ export class DeviceWebSocketService implements OnApplicationBootstrap {
 
       // Update device lastSeenAt via HTTP API using database UUID
       const updateResponse = await fetch(
-        `http://localhost:3000/devices/${deviceId}`,
+        this.apiUrlService.getDevicesApiUrl(deviceId),
         {
           method: "PATCH",
           headers: {
@@ -290,7 +292,7 @@ export class DeviceWebSocketService implements OnApplicationBootstrap {
     try {
       // Forward to HTTP API for setup completion
       const response = await fetch(
-        `http://localhost:3000/devices/setup-complete`,
+        this.apiUrlService.getApiUrl("/devices/setup-complete"),
         {
           method: "POST",
           headers: {
@@ -424,7 +426,7 @@ export class DeviceWebSocketService implements OnApplicationBootstrap {
       };
 
       const response = await fetch(
-        `http://localhost:3000/devices/${deviceId}/status`,
+        this.apiUrlService.getDevicesApiUrl(deviceId, "status"),
         {
           method: "PUT",
           headers: {
@@ -505,7 +507,9 @@ export class DeviceWebSocketService implements OnApplicationBootstrap {
       !/^[A-Za-z0-9_-]{1,64}$/.test(data.deviceId)
     ) {
       this.logger.error(
-        `Invalid deviceId in lightingSystemTest: ${JSON.stringify(data.deviceId)}`
+        `Invalid deviceId in lightingSystemTest: ${JSON.stringify(
+          data.deviceId
+        )}`
       );
       if (ws.readyState === WebSocket.OPEN) {
         ws.send(
@@ -523,7 +527,7 @@ export class DeviceWebSocketService implements OnApplicationBootstrap {
     try {
       // Update lighting system test result via HTTP API
       const response = await fetch(
-        `http://localhost:3000/devices/${data.deviceId}/lighting`,
+        this.apiUrlService.getDevicesApiUrl(data.deviceId, "lighting"),
         {
           method: "PATCH",
           headers: {

@@ -66,4 +66,18 @@ export class EnvironmentVariables {
   @IsString()
   @IsOptional()
   CORS_ORIGIN: string = "*";
+
+  // SSL Configuration for production
+  @IsString()
+  @IsOptional()
+  SSL_ENABLED: string = "false";
+
+  @IsString()
+  @IsOptional()
+  DOMAIN_NAME: string;
+
+  // Mobile app and ESP32 endpoints
+  @IsString()
+  @IsOptional()
+  API_BASE_URL: string;
 }

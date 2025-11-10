@@ -2,7 +2,9 @@
 
 This is the backend service for the PalPalette color sharing system, built with NestJS and PostgreSQL.
 
-## Setup
+## Quick Setup
+
+### Development
 
 1. Install dependencies:
    ```bash
@@ -13,6 +15,36 @@ This is the backend service for the PalPalette color sharing system, built with 
    ```bash
    npm run start:dev
    ```
+
+### Production Deployment (HTTPS)
+
+1. Set up your domain and server:
+   ```bash
+   # Deploy with automatic SSL setup
+   chmod +x deploy.sh
+   ./deploy.sh your-domain.com
+   ```
+2. Or manually:
+
+   ```bash
+   # Setup SSL certificates
+   chmod +x setup-ssl.sh
+   ./setup-ssl.sh your-domain.com
+
+   # Configure environment
+   cp .env.production.example .env.production
+   # Edit .env.production with your settings
+
+   # Deploy
+   docker-compose -f docker-compose.production.yml up -d
+   ```
+
+## API Endpoints
+
+- **Development**: `http://localhost:3000`
+- **Production**: `https://your-domain.com/api`
+- **WebSocket**: `wss://your-domain.com:3001/ws` (ESP32 devices)
+- **API Docs**: `https://your-domain.com/api` (Swagger UI)
 
 ## Features
 

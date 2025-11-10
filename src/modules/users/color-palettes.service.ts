@@ -240,7 +240,11 @@ export class ColorPalettesService {
           );
 
           this.logger.log(
-            `Push notification sent for message ${savedMessage.id} to user ${friendId} (timeframe: ${isWithinTimeframe ? "active" : "inactive"})`
+            `Push notification sent for message ${
+              savedMessage.id
+            } to user ${friendId} (timeframe: ${
+              isWithinTimeframe ? "active" : "inactive"
+            })`
           );
         } catch (error) {
           // Don't fail message sending if push fails

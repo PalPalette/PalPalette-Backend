@@ -9,6 +9,7 @@ import { User } from "../users/entities/user.entity";
 import { Device } from "../devices/entities/device.entity";
 import { DevicesModule } from "../devices/devices.module";
 import { PushModule } from "../push/push.module";
+import { ApiUrlService } from "../../common/services/api-url.service";
 
 @Module({
   imports: [
@@ -16,7 +17,12 @@ import { PushModule } from "../push/push.module";
     forwardRef(() => DevicesModule),
     PushModule,
   ],
-  providers: [MessagesService, MessagesGateway, DeviceWebSocketService],
+  providers: [
+    MessagesService,
+    MessagesGateway,
+    DeviceWebSocketService,
+    ApiUrlService,
+  ],
   controllers: [MessagesController],
   exports: [MessagesService, MessagesGateway, DeviceWebSocketService],
 })
