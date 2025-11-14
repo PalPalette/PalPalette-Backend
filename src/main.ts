@@ -15,8 +15,11 @@ async function bootstrap() {
   app.enableCors({
     origin: [
       "http://localhost",
-      "capacitor://localhost",
-      "https://your-domain.com", // Add your production HTTPS domain
+      "http://localhost:8100", // Ionic dev server
+      "capacitor://localhost", // Capacitor iOS
+      "ionic://localhost", // Alternative Capacitor iOS
+      "https://localhost", // HTTPS localhost
+      "https://cides06.gm.fh-koeln.de", // Your production domain
       process.env.CORS_ORIGIN || "*",
     ],
     credentials: true,

@@ -64,9 +64,9 @@ echo "✅ SSL auto-renewal configured (daily at 2 AM)"
 
 # Step 4: Build and start services
 echo "🐳 Building and starting Docker services..."
-docker-compose -f docker-compose.production.yml down || true
-docker-compose -f docker-compose.production.yml build --no-cache
-docker-compose -f docker-compose.production.yml up -d
+docker compose -f docker-compose.production.yml down || true
+docker compose -f docker-compose.production.yml build --no-cache
+docker compose -f docker-compose.production.yml up -d
 
 # Step 4: Wait for services to start
 echo "⏳ Waiting for services to start..."
@@ -74,7 +74,7 @@ sleep 30
 
 # Step 5: Run database migrations
 echo "📊 Running database migrations..."
-docker-compose -f docker-compose.production.yml exec backend npm run migration:run
+docker compose -f docker-compose.production.yml exec backend npm run migration:run
 
 # Step 6: Health check
 echo "🏥 Performing health check..."
@@ -107,9 +107,9 @@ echo "   - WSS: wss://$DOMAIN:3001/ws"
 echo "3. Test device registration and WebSocket connections"
 echo ""
 echo "📊 Useful commands:"
-echo "   - View logs: docker-compose -f docker-compose.production.yml logs -f"
-echo "   - Restart:   docker-compose -f docker-compose.production.yml restart"
-echo "   - Stop:      docker-compose -f docker-compose.production.yml down"
+echo "   - View logs: docker compose -f docker-compose.production.yml logs -f"
+echo "   - Restart:   docker compose -f docker-compose.production.yml restart"
+echo "   - Stop:      docker compose -f docker-compose.production.yml down"
 echo ""
 echo "🔒 SSL Certificate Management:"
 echo "   - Auto-renewal: Configured to run daily at 2 AM"

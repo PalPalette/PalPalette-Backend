@@ -44,11 +44,65 @@ case $choice in
         echo "⚠️  Make sure your domain points to this server's public IP!"
         read -p "Press Enter to continue..."
         
-        sudo certbot certonly --standalone -d $DOMAIN --email admin@$DOMAIN --agree-tos --no-eff-email
+        # Use webroot method if nginx is already running, otherwise standalone
+        if docker ps | grep -q nginx; then
+            echo "📡 Using webroot method (nginx is running)..."
+            sudo certbot certonly --webroot -w /var/www/html -d $DOMAIN --email admin@$DOMAIN --agree-tos --no-eff-email
+        else
+            echo "📡 Using standalone method..."
+            sudo certbot certonly --standalone -d $DOMAIN --email admin@$DOMAIN --agree-tos --no-eff-email
+        fi
         
-        # Copy certificates to our SSL directory
-        sudo cp /etc/letsencrypt/live/$DOMAIN/fullchain.pem ssl/certs/palpalette.crt
+        # Verify certificate chain completeness
+        echo "🔍 Verifying certificate chain..."
+        if ! openssl verify -CAfile /etc/ssl/certs/ca-certificates.crt /etc/letsencrypt/live/$DOMAIN/fullchain.pem; then
+            echo "⚠️  Certificate chain verification failed, this may cause iOS issues"
+        fi
+        
+        # Check if fullchain.pem actually contains the full chain
+        CHAIN_COUNT=$(openssl crl2pkcs7 -nocrl -certfile /etc/letsencrypt/live/$DOMAIN/fullchain.pem | openssl pkcs7 -print_certs -noout | grep -c "subject=" || echo "0")
+        echo "📊 Let's Encrypt fullchain.pem contains: $CHAIN_COUNT certificates"
+        
+        if [ "$CHAIN_COUNT" -lt 2 ]; then
+            echo "❌ ERROR: fullchain.pem is incomplete (only $CHAIN_COUNT certificates)"
+            echo "🔧 Attempting to build complete chain manually..."
+            
+            # Download intermediate certificate manually
+            echo "📥 Downloading Let's Encrypt E8 intermediate certificate..."
+            curl -s https://letsencrypt.org/certs/2024/e8.pem -o /tmp/lets-encrypt-e8.pem
+            
+            # Download ISRG Root X1 (optional, but helps iOS)
+            echo "📥 Downloading ISRG Root X1 certificate..."
+            curl -s https://letsencrypt.org/certs/isrgrootx1.pem -o /tmp/isrg-root-x1.pem
+            
+            # Build complete chain: domain cert + intermediate + root
+            echo "🔗 Building complete certificate chain..."
+            cat /etc/letsencrypt/live/$DOMAIN/cert.pem > /tmp/complete-chain.pem
+            cat /tmp/lets-encrypt-e8.pem >> /tmp/complete-chain.pem
+            cat /tmp/isrg-root-x1.pem >> /tmp/complete-chain.pem
+            
+            # Verify the manually built chain
+            if openssl verify -CAfile /etc/ssl/certs/ca-certificates.crt /tmp/complete-chain.pem; then
+                echo "✅ Manually built chain verified successfully"
+                sudo cp /tmp/complete-chain.pem ssl/certs/palpalette.crt
+            else
+                echo "❌ Manually built chain verification failed, using Let's Encrypt fullchain as fallback"
+                sudo cp /etc/letsencrypt/live/$DOMAIN/fullchain.pem ssl/certs/palpalette.crt
+            fi
+            
+            # Cleanup temporary files
+            rm -f /tmp/lets-encrypt-e8.pem /tmp/isrg-root-x1.pem /tmp/complete-chain.pem
+        else
+            echo "✅ Let's Encrypt fullchain.pem appears complete"
+            # Copy certificates to our SSL directory with full chain verification
+            sudo cp /etc/letsencrypt/live/$DOMAIN/fullchain.pem ssl/certs/palpalette.crt
+        fi
+        
         sudo cp /etc/letsencrypt/live/$DOMAIN/privkey.pem ssl/private/palpalette.key
+        
+        # Verify the copied certificate has full chain
+        echo "🔍 Verifying copied certificate chain..."
+        openssl crl2pkcs7 -nocrl -certfile ssl/certs/palpalette.crt | openssl pkcs7 -print_certs -noout | grep -c "subject=" || echo "Certificate count verification completed"
         
         # Set proper permissions
         sudo chmod 644 ssl/certs/palpalette.crt

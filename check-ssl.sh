@@ -25,6 +25,25 @@ DAYS_LEFT=$(( (EXPIRY_EPOCH - CURRENT_EPOCH) / 86400 ))
 echo "📅 Certificate expires: $EXPIRY_DATE"
 echo "⏰ Days until expiration: $DAYS_LEFT"
 
+# Check certificate chain completeness
+CERT_COUNT=$(openssl crl2pkcs7 -nocrl -certfile "$CERT_FILE" | openssl pkcs7 -print_certs -noout | grep -c "subject=" || echo "0")
+echo "🔗 Certificate chain contains: $CERT_COUNT certificates"
+
+if [ "$CERT_COUNT" -lt 2 ]; then
+    echo "⚠️  WARNING: Certificate chain may be incomplete (iOS devices may fail to connect)"
+    echo "Expected: 2+ certificates (domain + intermediate + optional root)"
+else
+    echo "✅ Certificate chain appears complete"
+fi
+
+# Test SSL connectivity
+echo "🔍 Testing SSL connectivity..."
+if openssl s_client -connect "$DOMAIN:443" -verify_return_error < /dev/null 2>/dev/null; then
+    echo "✅ SSL connection test passed"
+else
+    echo "❌ SSL connection test failed - iOS devices will likely fail to connect"
+fi
+
 if [ $DAYS_LEFT -lt 0 ]; then
     echo "🚨 CRITICAL: Certificate has EXPIRED!"
     echo "Run immediately: ./renew-ssl.sh $DOMAIN"
