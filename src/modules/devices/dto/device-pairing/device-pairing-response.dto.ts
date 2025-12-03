@@ -134,3 +134,109 @@ export class SupportedLightingSystemsResponseDto {
   })
   capabilities: Record<string, any>;
 }
+
+export class RegisterDeviceResponseDto {
+  @ApiProperty({
+    description: "Device information",
+    type: "object",
+  })
+  device: {
+    @ApiProperty({
+      description: "Device unique identifier (UUID)",
+      example: "0c029cd4-37cd-465b-9905-f392a4b73815",
+    })
+    id: string;
+
+    @ApiProperty({
+      description: "Device MAC address",
+      example: "B0:81:84:05:FF:98",
+    })
+    macAddress: string;
+
+    @ApiProperty({
+      description:
+        "Six-character pairing code (null for claimed devices)",
+      example: "ABC123",
+      nullable: true,
+    })
+    pairingCode: string | null;
+
+    @ApiProperty({
+      description: "Device claim status",
+      example: "claimed",
+      enum: ["claimed", "unclaimed"],
+    })
+    status: string;
+
+    @ApiProperty({
+      description: "Whether device has been provisioned",
+      example: true,
+    })
+    isProvisioned: boolean;
+
+    @ApiPropertyOptional({
+      description: "Owner email (only for claimed devices)",
+      example: "test@example.com",
+    })
+    ownerEmail?: string;
+
+    @ApiPropertyOptional({
+      description: "Owner display name (only for claimed devices)",
+      example: "Test User",
+    })
+    ownerName?: string;
+
+    @ApiProperty({
+      description: "Device type",
+      example: "esp32",
+    })
+    deviceType: string;
+
+    @ApiPropertyOptional({
+      description: "Firmware version",
+      example: "2.0.0",
+    })
+    firmwareVersion?: string;
+
+    @ApiPropertyOptional({
+      description: "Device IP address",
+      example: "192.168.1.100",
+    })
+    ipAddress?: string;
+
+    @ApiPropertyOptional({
+      description: "Device name",
+      example: "ESP32-FF98",
+    })
+    name?: string;
+
+    @ApiPropertyOptional({
+      description: "Configured lighting system type",
+      example: "nanoleaf",
+      enum: ["nanoleaf", "wled", "ws2812", "philips_hue"],
+      nullable: true,
+    })
+    lightingSystem?: string | null;
+
+    @ApiPropertyOptional({
+      description: "Lighting system host address (IP or hostname)",
+      example: "192.168.1.50",
+      nullable: true,
+    })
+    lightingHost?: string | null;
+
+    @ApiPropertyOptional({
+      description: "Lighting system port",
+      example: 16021,
+      nullable: true,
+    })
+    lightingPort?: number | null;
+
+    @ApiPropertyOptional({
+      description: "Lighting system authentication token",
+      example: "abc123token",
+      nullable: true,
+    })
+    lightingAuthToken?: string | null;
+  };
+}

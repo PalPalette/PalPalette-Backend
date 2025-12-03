@@ -73,10 +73,16 @@ export class LightingSystemConfigDto {
   lightingCustomConfig?: any;
 }
 
+/**
+ * DTO for updating lighting system configuration
+ * Used by ESP32 devices to report successful lighting system connection
+ * and store credentials in the backend for persistence across reboots
+ */
 export class UpdateLightingSystemDto {
   @ApiPropertyOptional({
-    example: "wled",
-    description: "Type of lighting system",
+    example: "nanoleaf",
+    description:
+      "Type of lighting system (nanoleaf, wled, ws2812, or philips_hue)",
     enum: ["nanoleaf", "wled", "ws2812", "philips_hue"],
   })
   @IsString()
@@ -85,24 +91,27 @@ export class UpdateLightingSystemDto {
   lightingSystemType?: string;
 
   @ApiPropertyOptional({
-    example: "192.168.1.101",
-    description: "Updated IP address or hostname",
+    example: "192.168.1.50",
+    description:
+      "IP address or hostname of the lighting system (for networked systems like Nanoleaf/WLED)",
   })
   @IsString()
   @IsOptional()
   lightingHostAddress?: string;
 
   @ApiPropertyOptional({
-    example: 8080,
-    description: "Updated port number",
+    example: 16021,
+    description:
+      "Port number for the lighting system (e.g., 16021 for Nanoleaf)",
   })
   @IsNumber()
   @IsOptional()
   lightingPort?: number;
 
   @ApiPropertyOptional({
-    example: "new-auth-token-456",
-    description: "Updated authentication token",
+    example: "abc123TokenXyz789",
+    description:
+      "Authentication token obtained from the lighting system (e.g., Nanoleaf auth token after button press)",
   })
   @IsString()
   @IsOptional()

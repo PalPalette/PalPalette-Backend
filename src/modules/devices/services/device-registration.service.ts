@@ -20,8 +20,23 @@ export class DeviceRegistrationService {
   ) {}
 
   async registerDevice(registerDeviceDto: RegisterDeviceDto): Promise<{
-    device: Device;
-    pairingCode: string;
+    device: {
+      id: string;
+      macAddress: string;
+      pairingCode: string | null;
+      status: string;
+      isProvisioned: boolean;
+      ownerEmail?: string;
+      ownerName?: string;
+      deviceType: string;
+      firmwareVersion?: string;
+      ipAddress?: string;
+      name?: string;
+      lightingSystem?: string | null;
+      lightingHost?: string | null;
+      lightingPort?: number | null;
+      lightingAuthToken?: string | null;
+    };
   }> {
     const {
       macAddress,
@@ -49,80 +64,104 @@ export class DeviceRegistrationService {
     );
     console.log("  - Lighting Custom Config:", lightingCustomConfig);
 
-    // Check if device already exists
+    // Check if device already exists (with user relation)
     const existingDevice = await this.deviceRepository.findOne({
       where: { macAddress },
+      relations: ["user"],
     });
 
     if (existingDevice) {
-      // If device exists and is unclaimed, generate new pairing code
-      if (!existingDevice.user) {
-        const pairingCode = this.generatePairingCode();
-        const pairingCodeExpiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
+      // Update last seen and online status
+      existingDevice.isOnline = true;
+      existingDevice.lastSeenAt = new Date();
 
-        existingDevice.pairingCode = pairingCode;
-        existingDevice.pairingCodeExpiresAt = pairingCodeExpiresAt;
-        existingDevice.isOnline = true;
-        existingDevice.lastSeenAt = new Date();
-
-        if (ipAddress) {
-          existingDevice.ipAddress = ipAddress;
-        }
-
-        // Update lighting configuration if provided
-        if (lightingSystemType) {
-          console.log(
-            "💡 Updating lighting configuration for unclaimed device:"
-          );
-          console.log(
-            "  - Old System Type:",
-            existingDevice.lightingSystemType
-          );
-          console.log("  - New System Type:", lightingSystemType);
-
-          existingDevice.lightingSystemType = lightingSystemType;
-          existingDevice.lightingHostAddress = lightingHostAddress || null;
-          existingDevice.lightingPort = lightingPort || null;
-          existingDevice.lightingAuthToken = lightingAuthToken || null;
-          existingDevice.lightingCustomConfig = lightingCustomConfig || null;
-          existingDevice.lightingSystemConfigured = true;
-
-          console.log("✅ Lighting configuration updated for unclaimed device");
-        }
-
-        const savedDevice = await this.deviceRepository.save(existingDevice);
-        return { device: savedDevice, pairingCode };
-      } else {
-        // Device is already claimed, just update status
-        existingDevice.isOnline = true;
-        existingDevice.lastSeenAt = new Date();
-
-        if (ipAddress) {
-          existingDevice.ipAddress = ipAddress;
-        }
-
-        // Update lighting configuration if provided
-        if (lightingSystemType) {
-          console.log("💡 Updating lighting configuration for claimed device:");
-          console.log(
-            "  - Old System Type:",
-            existingDevice.lightingSystemType
-          );
-          console.log("  - New System Type:", lightingSystemType);
-
-          existingDevice.lightingSystemType = lightingSystemType;
-          existingDevice.lightingHostAddress = lightingHostAddress || null;
-          existingDevice.lightingPort = lightingPort || null;
-          existingDevice.lightingAuthToken = lightingAuthToken || null;
-          existingDevice.lightingCustomConfig = lightingCustomConfig || null;
-          existingDevice.lightingSystemConfigured = true;
-
-          console.log("✅ Lighting configuration updated for claimed device");
-        }
-
-        const savedDevice = await this.deviceRepository.save(existingDevice);
-        return { device: savedDevice, pairingCode: null };
+      if (ipAddress) {
+        existingDevice.ipAddress = ipAddress;
       }
+
+      if (firmwareVersion) {
+        existingDevice.firmwareVersion = firmwareVersion;
+      }
+
+      // Update lighting configuration if provided
+      if (lightingSystemType) {
+        console.log(
+          existingDevice.user
+            ? "💡 Updating lighting configuration for claimed device:"
+            : "💡 Updating lighting configuration for unclaimed device:"
+        );
+        console.log("  - Old System Type:", existingDevice.lightingSystemType);
+        console.log("  - New System Type:", lightingSystemType);
+
+        existingDevice.lightingSystemType = lightingSystemType;
+        existingDevice.lightingHostAddress = lightingHostAddress || null;
+        existingDevice.lightingPort = lightingPort || null;
+        existingDevice.lightingAuthToken = lightingAuthToken || null;
+        existingDevice.lightingCustomConfig = lightingCustomConfig || null;
+        existingDevice.lightingSystemConfigured = true;
+
+        console.log("✅ Lighting configuration updated");
+      }
+
+      const savedDevice = await this.deviceRepository.save(existingDevice);
+
+      // If device is claimed, return claimed status with owner info
+      if (savedDevice.user) {
+        console.log("✅ Claimed device reconnected:", savedDevice.id);
+        console.log("  - Owner:", savedDevice.user.email);
+        console.log("  - Lighting System:", savedDevice.lightingSystemType);
+
+        return {
+          device: {
+            id: savedDevice.id,
+            macAddress: savedDevice.macAddress,
+            pairingCode: null, // Don't expose pairing code for claimed devices
+            status: "claimed",
+            isProvisioned: true,
+            ownerEmail: savedDevice.user.email,
+            ownerName: savedDevice.user.displayName,
+            deviceType: savedDevice.type,
+            firmwareVersion: savedDevice.firmwareVersion,
+            ipAddress: savedDevice.ipAddress,
+            name: savedDevice.name,
+            lightingSystem: savedDevice.lightingSystemType,
+            lightingHost: savedDevice.lightingHostAddress,
+            lightingPort: savedDevice.lightingPort,
+            lightingAuthToken: savedDevice.lightingAuthToken,
+          },
+        };
+      }
+
+      // Device exists but is unclaimed - regenerate pairing code
+      const pairingCode = this.generatePairingCode();
+      const pairingCodeExpiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
+
+      savedDevice.pairingCode = pairingCode;
+      savedDevice.pairingCodeExpiresAt = pairingCodeExpiresAt;
+
+      const updatedDevice = await this.deviceRepository.save(savedDevice);
+
+      console.log("✅ Unclaimed device reconnected:", updatedDevice.id);
+      console.log("  - New pairing code:", pairingCode);
+      console.log("  - Lighting System:", updatedDevice.lightingSystemType);
+
+      return {
+        device: {
+          id: updatedDevice.id,
+          macAddress: updatedDevice.macAddress,
+          pairingCode: pairingCode,
+          status: "unclaimed",
+          isProvisioned: false,
+          deviceType: updatedDevice.type,
+          firmwareVersion: updatedDevice.firmwareVersion,
+          ipAddress: updatedDevice.ipAddress,
+          name: updatedDevice.name,
+          lightingSystem: updatedDevice.lightingSystemType,
+          lightingHost: updatedDevice.lightingHostAddress,
+          lightingPort: updatedDevice.lightingPort,
+          lightingAuthToken: updatedDevice.lightingAuthToken,
+        },
+      };
     }
 
     // Create new device
@@ -145,8 +184,9 @@ export class DeviceRegistrationService {
       pairingCodeExpiresAt,
       status: "unclaimed",
       isOnline: true,
-      isProvisioned: true,
+      isProvisioned: false, // New devices are not provisioned yet
       lastSeenAt: new Date(),
+      firmwareVersion: firmwareVersion,
       // Set lighting configuration if provided
       lightingSystemType: lightingSystemType || "ws2812", // Default to ws2812
       lightingHostAddress: lightingHostAddress || null,
@@ -158,11 +198,29 @@ export class DeviceRegistrationService {
 
     const savedDevice = await this.deviceRepository.save(device);
     console.log("✅ New device created with ID:", savedDevice.id);
+    console.log("  - Pairing code:", pairingCode);
     console.log(
       "💡 Lighting system configured:",
       savedDevice.lightingSystemType
     );
-    return { device: savedDevice, pairingCode };
+
+    return {
+      device: {
+        id: savedDevice.id,
+        macAddress: savedDevice.macAddress,
+        pairingCode: pairingCode,
+        status: "unclaimed",
+        isProvisioned: false,
+        deviceType: savedDevice.type,
+        firmwareVersion: savedDevice.firmwareVersion,
+        ipAddress: savedDevice.ipAddress,
+        name: savedDevice.name,
+        lightingSystem: savedDevice.lightingSystemType,
+        lightingHost: savedDevice.lightingHostAddress,
+        lightingPort: savedDevice.lightingPort,
+        lightingAuthToken: savedDevice.lightingAuthToken,
+      },
+    };
   }
 
   async updateDeviceStatus(

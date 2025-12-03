@@ -45,41 +45,47 @@ export class RegisterDeviceDto {
   @IsString()
   firmwareVersion?: string;
 
-  // Lighting system configuration (from captive portal)
+  // Lighting system configuration (optional - can be updated later via PUT /devices/:id/lighting)
   @ApiPropertyOptional({
-    example: "philips_hue",
-    description: "Type of lighting system to connect to",
+    example: "nanoleaf",
+    description:
+      "Type of lighting system (optional during registration, can be configured later)",
+    enum: ["nanoleaf", "wled", "ws2812", "philips_hue"],
   })
   @IsOptional()
   @IsString()
   lightingSystemType?: string;
 
   @ApiPropertyOptional({
-    example: "192.168.1.2",
-    description: "Host address of the lighting system",
+    example: "192.168.1.50",
+    description:
+      "IP address or hostname of the lighting system (optional during registration)",
   })
   @IsOptional()
   @IsString()
   lightingHostAddress?: string;
 
   @ApiPropertyOptional({
-    example: 80,
-    description: "Port for lighting system connection",
+    example: 16021,
+    description:
+      "Port for lighting system connection (optional during registration)",
   })
   @IsOptional()
   @IsNumber()
   lightingPort?: number;
 
   @ApiPropertyOptional({
-    example: "hue-auth-token-123",
-    description: "Authentication token for lighting system",
+    example: "abc123TokenXyz789",
+    description:
+      "Authentication token for lighting system (optional during registration)",
   })
   @IsOptional()
   @IsString()
   lightingAuthToken?: string;
 
   @ApiPropertyOptional({
-    description: "Custom configuration object for specific lighting systems",
+    description:
+      "Custom configuration object for specific lighting systems (optional during registration)",
   })
   @IsOptional()
   @IsObject()

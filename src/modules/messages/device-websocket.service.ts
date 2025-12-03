@@ -875,18 +875,30 @@ export class DeviceWebSocketService implements OnApplicationBootstrap {
       if (existingDevice) {
         // Update existing device with new information using repository directly
         const deviceRepository = this.devicesService["deviceRepository"];
-        await deviceRepository.update(deviceData.id, {
+
+        // Prepare update data
+        const updateData: any = {
           ipAddress: deviceData.ipAddress,
           firmwareVersion: deviceData.firmwareVersion,
-          isProvisioned: deviceData.isProvisioned,
-          pairingCode: deviceData.pairingCode,
           status: "online",
           isOnline: true,
           lastSeenAt: new Date(),
-        });
-        this.logger.log(
-          `📝 Updated existing device in database: ${deviceData.id}`
-        );
+        };
+
+        // Only update provisioning status and pairing code for unclaimed devices
+        if (!existingDevice.user) {
+          updateData.isProvisioned = deviceData.isProvisioned;
+          updateData.pairingCode = deviceData.pairingCode;
+          this.logger.log(
+            `📝 Updating unclaimed device in database: ${deviceData.id}`
+          );
+        } else {
+          this.logger.log(
+            `📝 Updating claimed device in database (preserving claim): ${deviceData.id}`
+          );
+        }
+
+        await deviceRepository.update(deviceData.id, updateData);
       } else {
         // Create new device using repository directly
         const deviceRepository = this.devicesService["deviceRepository"];

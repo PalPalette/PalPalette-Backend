@@ -28,6 +28,7 @@ import {
   DevicePairingInfoDto,
   ResetDeviceResponseDto,
   SupportedLightingSystemsResponseDto,
+  RegisterDeviceResponseDto,
 } from "./dto/device-pairing/device-pairing-response.dto";
 import {
   LightingSystemConfigDto,
@@ -56,10 +57,19 @@ export class DevicesController {
   // New self-setup endpoints
   @Public()
   @Post("register")
-  @ApiOperation({ summary: "Register a new device (self-setup)" })
-  @ApiResponse({ status: 201, description: "Device registered successfully" })
+  @ApiOperation({
+    summary: "Register or reconnect a device",
+    description:
+      "Devices call this on boot to register or get their current state. " +
+      "Returns claim status, owner info (if claimed), and lighting configuration.",
+  })
+  @ApiResponse({
+    status: 201,
+    description:
+      "Device registered/reconnected successfully. Returns different data based on claim status.",
+    type: RegisterDeviceResponseDto,
+  })
   @ApiResponse({ status: 400, description: "Bad request - validation error" })
-  @ApiResponse({ status: 409, description: "Device already exists" })
   async registerDevice(@Body() registerDeviceDto: RegisterDeviceDto) {
     return this.deviceRegistrationService.registerDevice(registerDeviceDto);
   }
@@ -130,6 +140,38 @@ export class DevicesController {
   async resetDevice(@Param("id") id: string, @Request() req) {
     await this.devicePairingService.resetDevice(id, req.user.userId);
     return { message: "Device reset successfully" };
+  }
+
+  @Public()
+  @Put(":id/lighting")
+  @ApiOperation({
+    summary: "Update lighting system configuration (device self-reporting)",
+    description:
+      "Devices call this endpoint after successfully connecting to their lighting system " +
+      "(e.g., Nanoleaf, WLED) to store/update the configuration in the backend. " +
+      "This ensures the configuration persists even if the device loses power.",
+  })
+  @ApiParam({
+    name: "id",
+    description: "Device ID (UUID)",
+    example: "0c029cd4-37cd-465b-9905-f392a4b73815",
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      "Lighting configuration updated successfully. Returns updated device.",
+  })
+  @ApiResponse({ status: 400, description: "Bad request - validation error" })
+  @ApiResponse({ status: 404, description: "Device not found" })
+  async updateDeviceLighting(
+    @Param("id") deviceId: string,
+    @Body() updates: UpdateLightingSystemDto
+  ) {
+    console.log(
+      `💡 Device ${deviceId} updating lighting configuration:`,
+      updates
+    );
+    return this.lightingSystemsService.updateLightingSystem(deviceId, updates);
   }
 
   @Public()
