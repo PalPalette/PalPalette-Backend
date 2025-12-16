@@ -13,14 +13,14 @@ export class AnonymizationUtil {
    */
   getAnonymizedUserId(userId: string | null): string {
     if (!userId) {
-      return 'anon_user_unknown';
+      return "anon_user_unknown";
     }
 
     if (this.userIdMap.has(userId)) {
       return this.userIdMap.get(userId)!;
     }
 
-    const anonymizedId = `anon_user_${String(this.counter).padStart(3, '0')}`;
+    const anonymizedId = `anon_user_${String(this.counter).padStart(3, "0")}`;
     this.userIdMap.set(userId, anonymizedId);
     this.counter++;
 

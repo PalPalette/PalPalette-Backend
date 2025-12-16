@@ -1,8 +1,8 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between, LessThanOrEqual, MoreThanOrEqual } from 'typeorm';
-import { Message } from '../messages/entities/message.entity';
-import { User } from '../users/entities/user.entity';
+import { Injectable, NotFoundException, Logger } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository, Between, LessThanOrEqual, MoreThanOrEqual } from "typeorm";
+import { Message } from "../messages/entities/message.entity";
+import { User } from "../users/entities/user.entity";
 import {
   UserAnalyticsExportDto,
   AggregateAnalyticsExportDto,
@@ -11,9 +11,9 @@ import {
   AggregateUserSummary,
   GlobalSummary,
   ExportPeriod,
-} from './dto/analytics-export.dto';
-import { AnonymizationUtil } from './utils/anonymization.util';
-import { CsvExportUtil } from './utils/csv-export.util';
+} from "./dto/analytics-export.dto";
+import { AnonymizationUtil } from "./utils/anonymization.util";
+import { CsvExportUtil } from "./utils/csv-export.util";
 
 @Injectable()
 export class AnalyticsService {
@@ -23,7 +23,7 @@ export class AnalyticsService {
     @InjectRepository(Message)
     private readonly messageRepository: Repository<Message>,
     @InjectRepository(User)
-    private readonly userRepository: Repository<User>,
+    private readonly userRepository: Repository<User>
   ) {}
 
   /**
@@ -31,9 +31,9 @@ export class AnalyticsService {
    */
   async exportUserAnalytics(
     userId: string,
-    format: 'json' | 'csv',
+    format: "json" | "csv",
     dateFrom?: string,
-    dateTo?: string,
+    dateTo?: string
   ): Promise<UserAnalyticsExportDto | string> {
     // Verify user exists
     const user = await this.userRepository.findOne({ where: { id: userId } });
@@ -50,23 +50,23 @@ export class AnalyticsService {
     // Get sent messages
     const sentMessages = await this.messageRepository.find({
       where: { sender: { id: userId }, ...dateFilter },
-      relations: ['sender', 'recipient', 'device'],
-      order: { sentAt: 'ASC' },
+      relations: ["sender", "recipient", "device"],
+      order: { sentAt: "ASC" },
     });
 
     // Get received messages
     const receivedMessages = await this.messageRepository.find({
       where: { recipient: { id: userId }, ...dateFilter },
-      relations: ['sender', 'recipient', 'device'],
-      order: { sentAt: 'ASC' },
+      relations: ["sender", "recipient", "device"],
+      order: { sentAt: "ASC" },
     });
 
     // Calculate summary statistics
     const uniqueRecipients = new Set(
-      sentMessages.map((m) => m.recipient?.id).filter(Boolean),
+      sentMessages.map((m) => m.recipient?.id).filter(Boolean)
     );
     const uniqueSenders = new Set(
-      receivedMessages.map((m) => m.sender?.id).filter(Boolean),
+      receivedMessages.map((m) => m.sender?.id).filter(Boolean)
     );
 
     const summary: UserSummary = {
@@ -76,31 +76,35 @@ export class AnalyticsService {
       unique_senders: uniqueSenders.size,
       total_colors_sent: sentMessages.reduce(
         (sum, m) => sum + (m.colors?.length || 0),
-        0,
+        0
       ),
       total_colors_received: receivedMessages.reduce(
         (sum, m) => sum + (m.colors?.length || 0),
-        0,
+        0
       ),
     };
 
     // Anonymize and combine messages
     const anonymizedSentMessages = sentMessages.map((msg) => ({
       ...this.anonymizeMessage(msg, anonymizer),
-      direction: 'sent' as const,
+      direction: "sent" as const,
     }));
 
     const anonymizedReceivedMessages = receivedMessages.map((msg) => ({
       ...this.anonymizeMessage(msg, anonymizer),
-      direction: 'received' as const,
+      direction: "received" as const,
     }));
 
-    const allMessages = [...anonymizedSentMessages, ...anonymizedReceivedMessages].sort(
-      (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+    const allMessages = [
+      ...anonymizedSentMessages,
+      ...anonymizedReceivedMessages,
+    ].sort(
+      (a, b) =>
+        new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
     );
 
     const exportData: UserAnalyticsExportDto = {
-      export_type: 'user_analytics',
+      export_type: "user_analytics",
       timestamp: new Date().toISOString(),
       user_id: anonymizedUserId,
       period: this.buildPeriod(dateFrom, dateTo),
@@ -108,7 +112,7 @@ export class AnalyticsService {
       messages: allMessages,
     };
 
-    if (format === 'csv') {
+    if (format === "csv") {
       return CsvExportUtil.userMessagesToCsv(allMessages);
     }
 
@@ -119,10 +123,10 @@ export class AnalyticsService {
    * Export aggregate analytics for all users
    */
   async exportAggregateAnalytics(
-    format: 'json' | 'csv',
+    format: "json" | "csv",
     dateFrom?: string,
     dateTo?: string,
-    includeMessages: boolean = false,
+    includeMessages: boolean = false
   ): Promise<AggregateAnalyticsExportDto | string> {
     const anonymizer = new AnonymizationUtil();
 
@@ -132,8 +136,8 @@ export class AnalyticsService {
     // Get all messages
     const allMessages = await this.messageRepository.find({
       where: dateFilter,
-      relations: ['sender', 'recipient', 'device'],
-      order: { sentAt: 'ASC' },
+      relations: ["sender", "recipient", "device"],
+      order: { sentAt: "ASC" },
     });
 
     // Get all users who sent or received messages
@@ -144,46 +148,61 @@ export class AnalyticsService {
     });
 
     // Calculate per-user statistics
-    const userSummaries: AggregateUserSummary[] = Array.from(userIds).map((userId) => {
-      const sent = allMessages.filter((m) => m.sender?.id === userId);
-      const received = allMessages.filter((m) => m.recipient?.id === userId);
-      const uniqueRecipients = new Set(sent.map((m) => m.recipient?.id).filter(Boolean));
-      const uniqueSenders = new Set(received.map((m) => m.sender?.id).filter(Boolean));
+    const userSummaries: AggregateUserSummary[] = Array.from(userIds).map(
+      (userId) => {
+        const sent = allMessages.filter((m) => m.sender?.id === userId);
+        const received = allMessages.filter((m) => m.recipient?.id === userId);
+        const uniqueRecipients = new Set(
+          sent.map((m) => m.recipient?.id).filter(Boolean)
+        );
+        const uniqueSenders = new Set(
+          received.map((m) => m.sender?.id).filter(Boolean)
+        );
 
-      return {
-        user_id: anonymizer.getAnonymizedUserId(userId),
-        messages_sent: sent.length,
-        messages_received: received.length,
-        unique_recipients: uniqueRecipients.size,
-        unique_senders: uniqueSenders.size,
-        total_colors_sent: sent.reduce((sum, m) => sum + (m.colors?.length || 0), 0),
-        total_colors_received: received.reduce(
-          (sum, m) => sum + (m.colors?.length || 0),
-          0,
-        ),
-      };
-    });
+        return {
+          user_id: anonymizer.getAnonymizedUserId(userId),
+          messages_sent: sent.length,
+          messages_received: received.length,
+          unique_recipients: uniqueRecipients.size,
+          unique_senders: uniqueSenders.size,
+          total_colors_sent: sent.reduce(
+            (sum, m) => sum + (m.colors?.length || 0),
+            0
+          ),
+          total_colors_received: received.reduce(
+            (sum, m) => sum + (m.colors?.length || 0),
+            0
+          ),
+        };
+      }
+    );
 
     // Calculate global statistics
     const deliveredMessages = allMessages.filter((m) => m.deliveredAt !== null);
-    const totalColors = allMessages.reduce((sum, m) => sum + (m.colors?.length || 0), 0);
+    const totalColors = allMessages.reduce(
+      (sum, m) => sum + (m.colors?.length || 0),
+      0
+    );
 
     const globalSummary: GlobalSummary = {
       total_users: userIds.size,
       total_messages: allMessages.length,
       total_delivered: deliveredMessages.length,
       delivery_rate:
-        allMessages.length > 0 ? deliveredMessages.length / allMessages.length : 0,
+        allMessages.length > 0
+          ? deliveredMessages.length / allMessages.length
+          : 0,
       average_colors_per_message:
         allMessages.length > 0 ? totalColors / allMessages.length : 0,
       date_range: {
         first_message: allMessages[0]?.sentAt?.toISOString() || null,
-        last_message: allMessages[allMessages.length - 1]?.sentAt?.toISOString() || null,
+        last_message:
+          allMessages[allMessages.length - 1]?.sentAt?.toISOString() || null,
       },
     };
 
     const exportData: AggregateAnalyticsExportDto = {
-      export_type: 'aggregate_analytics',
+      export_type: "aggregate_analytics",
       timestamp: new Date().toISOString(),
       period: this.buildPeriod(dateFrom, dateTo),
       global_summary: globalSummary,
@@ -193,14 +212,14 @@ export class AnalyticsService {
     // Optionally include all messages
     if (includeMessages) {
       exportData.messages = allMessages.map((msg) =>
-        this.anonymizeMessage(msg, anonymizer),
+        this.anonymizeMessage(msg, anonymizer)
       );
     }
 
-    if (format === 'csv') {
+    if (format === "csv") {
       // For CSV, always include messages
       const anonymizedMessages = allMessages.map((msg) =>
-        this.anonymizeMessage(msg, anonymizer),
+        this.anonymizeMessage(msg, anonymizer)
       );
       return CsvExportUtil.messagesToCsv(anonymizedMessages);
     }
@@ -213,12 +232,14 @@ export class AnalyticsService {
    */
   private anonymizeMessage(
     message: Message,
-    anonymizer: AnonymizationUtil,
+    anonymizer: AnonymizationUtil
   ): AnonymizedMessageData {
     return {
       message_id: `msg_${message.id.substring(0, 8)}`,
       sender_id: anonymizer.getAnonymizedUserId(message.sender?.id || null),
-      recipient_id: anonymizer.getAnonymizedUserId(message.recipient?.id || null),
+      recipient_id: anonymizer.getAnonymizedUserId(
+        message.recipient?.id || null
+      ),
       timestamp: message.sentAt.toISOString(),
       status: message.status,
       delivery_timestamp: message.deliveredAt?.toISOString() || null,
@@ -233,7 +254,7 @@ export class AnalyticsService {
    */
   private buildDateFilter(
     dateFrom?: string,
-    dateTo?: string,
+    dateTo?: string
   ): { sentAt?: any } | Record<string, never> {
     if (!dateFrom && !dateTo) {
       return {};

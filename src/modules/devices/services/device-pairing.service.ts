@@ -102,20 +102,23 @@ export class DevicePairingService {
       );
     }
 
-    // Notify ESP32 device to factory reset before database delete
+    // Notify ESP32 device to factory reset
     const factoryResetSent = this.webSocketService.sendFactoryReset(deviceId);
 
     if (factoryResetSent) {
       console.log(`🔄 Factory reset command sent to device ${deviceId}`);
+      console.log(
+        `⏳ Waiting for device acknowledgment before deleting from database...`
+      );
+      // Device will be deleted from database when it responds with factoryResetAcknowledged
     } else {
       console.log(
-        `⚠️ Device ${deviceId} not connected, performing database delete only`
+        `⚠️ Device ${deviceId} not connected, performing database delete immediately`
       );
+      // Delete device from database immediately if not connected
+      await this.deviceRepository.remove(device);
+      console.log(`✅ Device ${deviceId} has been deleted from the system`);
     }
-
-    // Delete device from database
-    await this.deviceRepository.remove(device);
-    console.log(`✅ Device ${deviceId} has been fully deleted from the system`);
   }
 
   async validatePairingCode(code: string): Promise<Device | null> {

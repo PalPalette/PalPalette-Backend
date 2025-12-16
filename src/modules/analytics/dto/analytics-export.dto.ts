@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 
 /**
  * Anonymized message data for export
@@ -40,31 +40,31 @@ export interface UserSummary {
  */
 export class UserAnalyticsExportDto {
   @ApiProperty({
-    description: 'Type of export',
-    example: 'user_analytics',
+    description: "Type of export",
+    example: "user_analytics",
   })
   export_type: string;
 
   @ApiProperty({
-    description: 'Timestamp when export was generated',
-    example: '2025-12-08T10:30:00Z',
+    description: "Timestamp when export was generated",
+    example: "2025-12-08T10:30:00Z",
   })
   timestamp: string;
 
   @ApiProperty({
-    description: 'Anonymized user ID - consistent within this export only',
-    example: 'anon_user_001',
+    description: "Anonymized user ID - consistent within this export only",
+    example: "anon_user_001",
   })
   user_id: string;
 
   @ApiProperty({
-    description: 'Period covered by the export',
-    example: { start: '2025-01-01T00:00:00Z', end: '2025-12-31T23:59:59Z' },
+    description: "Period covered by the export",
+    example: { start: "2025-01-01T00:00:00Z", end: "2025-12-31T23:59:59Z" },
   })
   period: ExportPeriod;
 
   @ApiProperty({
-    description: 'Summary statistics for the user',
+    description: "Summary statistics for the user",
     example: {
       messages_sent: 15,
       messages_received: 23,
@@ -77,25 +77,26 @@ export class UserAnalyticsExportDto {
   summary: UserSummary;
 
   @ApiProperty({
-    description: 'Array of messages (sent and received) with direction indicator',
-    type: 'array',
+    description:
+      "Array of messages (sent and received) with direction indicator",
+    type: "array",
     isArray: true,
     example: [
       {
-        message_id: 'msg_12345678',
-        direction: 'sent',
-        sender_id: 'anon_user_001',
-        recipient_id: 'anon_user_002',
-        timestamp: '2025-12-05T14:30:00Z',
-        status: 'delivered',
-        delivery_timestamp: '2025-12-05T14:31:15Z',
-        colors: ['#FF6B35', '#F7931E', '#FFD23F'],
+        message_id: "msg_12345678",
+        direction: "sent",
+        sender_id: "anon_user_001",
+        recipient_id: "anon_user_002",
+        timestamp: "2025-12-05T14:30:00Z",
+        status: "delivered",
+        delivery_timestamp: "2025-12-05T14:31:15Z",
+        colors: ["#FF6B35", "#F7931E", "#FFD23F"],
         color_count: 3,
         image_url: null,
       },
     ],
   })
-  messages: Array<AnonymizedMessageData & { direction: 'sent' | 'received' }>;
+  messages: Array<AnonymizedMessageData & { direction: "sent" | "received" }>;
 }
 
 /**
@@ -131,25 +132,25 @@ export interface GlobalSummary {
  */
 export class AggregateAnalyticsExportDto {
   @ApiProperty({
-    description: 'Type of export',
-    example: 'aggregate_analytics',
+    description: "Type of export",
+    example: "aggregate_analytics",
   })
   export_type: string;
 
   @ApiProperty({
-    description: 'Timestamp when export was generated',
-    example: '2025-12-08T10:30:00Z',
+    description: "Timestamp when export was generated",
+    example: "2025-12-08T10:30:00Z",
   })
   timestamp: string;
 
   @ApiProperty({
-    description: 'Period covered by the export',
-    example: { start: '2025-01-01T00:00:00Z', end: '2025-12-31T23:59:59Z' },
+    description: "Period covered by the export",
+    example: { start: "2025-01-01T00:00:00Z", end: "2025-12-31T23:59:59Z" },
   })
   period: ExportPeriod;
 
   @ApiProperty({
-    description: 'Global summary statistics across all users',
+    description: "Global summary statistics across all users",
     example: {
       total_users: 12,
       total_messages: 248,
@@ -157,20 +158,20 @@ export class AggregateAnalyticsExportDto {
       delivery_rate: 0.94,
       average_colors_per_message: 3.2,
       date_range: {
-        first_message: '2025-01-15T08:30:00Z',
-        last_message: '2025-12-08T16:45:00Z',
+        first_message: "2025-01-15T08:30:00Z",
+        last_message: "2025-12-08T16:45:00Z",
       },
     },
   })
   global_summary: GlobalSummary;
 
   @ApiProperty({
-    description: 'Summary statistics per anonymized user',
-    type: 'array',
+    description: "Summary statistics per anonymized user",
+    type: "array",
     isArray: true,
     example: [
       {
-        user_id: 'anon_user_001',
+        user_id: "anon_user_001",
         messages_sent: 15,
         messages_received: 23,
         unique_recipients: 4,
@@ -179,7 +180,7 @@ export class AggregateAnalyticsExportDto {
         total_colors_received: 142,
       },
       {
-        user_id: 'anon_user_002',
+        user_id: "anon_user_002",
         messages_sent: 20,
         messages_received: 18,
         unique_recipients: 6,
@@ -193,18 +194,18 @@ export class AggregateAnalyticsExportDto {
 
   @ApiPropertyOptional({
     description:
-      'All messages with anonymized IDs (only included if includeMessages=true in query)',
-    type: 'array',
+      "All messages with anonymized IDs (only included if includeMessages=true in query)",
+    type: "array",
     isArray: true,
     example: [
       {
-        message_id: 'msg_12345678',
-        sender_id: 'anon_user_001',
-        recipient_id: 'anon_user_002',
-        timestamp: '2025-12-05T14:30:00Z',
-        status: 'delivered',
-        delivery_timestamp: '2025-12-05T14:31:15Z',
-        colors: ['#FF6B35', '#F7931E', '#FFD23F'],
+        message_id: "msg_12345678",
+        sender_id: "anon_user_001",
+        recipient_id: "anon_user_002",
+        timestamp: "2025-12-05T14:30:00Z",
+        status: "delivered",
+        delivery_timestamp: "2025-12-05T14:31:15Z",
+        colors: ["#FF6B35", "#F7931E", "#FFD23F"],
         color_count: 3,
         image_url: null,
       },
