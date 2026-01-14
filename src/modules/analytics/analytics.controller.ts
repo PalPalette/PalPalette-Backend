@@ -69,7 +69,7 @@ export class AnalyticsController {
     @Query("format") format: string = "json",
     @Query("dateFrom") dateFrom?: string,
     @Query("dateTo") dateTo?: string,
-    @Res() res?: Response
+    @Res({ passthrough: true }) res?: Response
   ) {
     // Validate format
     if (format !== "json" && format !== "csv") {
@@ -151,7 +151,7 @@ export class AnalyticsController {
     @Query("dateFrom") dateFrom?: string,
     @Query("dateTo") dateTo?: string,
     @Query("includeMessages") includeMessages?: string,
-    @Res() res?: Response
+    @Res({ passthrough: true }) res?: Response
   ) {
     // Validate format
     if (format !== "json" && format !== "csv") {
