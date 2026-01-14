@@ -44,8 +44,9 @@ export class AnalyticsService {
     const anonymizer = new AnonymizationUtil();
     const anonymizedUserId = anonymizer.getAnonymizedUserId(userId);
 
-    // Build date filter
-    const dateFilter = this.buildDateFilter(dateFrom, dateTo);
+    // Build date filter values
+    const dateFromObj = dateFrom ? new Date(dateFrom) : null;
+    const dateToObj = dateTo ? new Date(dateTo) : null;
 
     // Get sent messages
     const sentMessages = await this.messageRepository.find({
@@ -130,15 +131,43 @@ export class AnalyticsService {
   ): Promise<AggregateAnalyticsExportDto | string> {
     const anonymizer = new AnonymizationUtil();
 
-    // Build date filter
-    const dateFilter = this.buildDateFilter(dateFrom, dateTo);
+    // Build date filter values for query builder
+    const dateFromObj = dateFrom ? new Date(dateFrom) : null;
+    const dateToObj = dateTo ? new Date(dateTo) : null;
 
-    // Get all messages
-    const allMessages = await this.messageRepository.find({
-      where: dateFilter,
-      relations: ["sender", "recipient", "device"],
-      order: { sentAt: "ASC" },
-    });
+    // Get all messages with a lightweight select to avoid heavy joins
+    const qb = this.messageRepository
+      .createQueryBuilder("message")
+      .leftJoin("message.sender", "sender")
+      .leftJoin("message.recipient", "recipient")
+      .select([
+        "message.id",
+        "message.sentAt",
+        "message.deliveredAt",
+        "message.status",
+        "message.colors",
+        "message.imageUrl",
+        "sender.id",
+        "recipient.id",
+      ])
+      .orderBy("message.sentAt", "ASC");
+
+    if (dateFromObj && dateToObj) {
+      qb.andWhere("message.sentAt BETWEEN :dateFrom AND :dateTo", {
+        dateFrom: dateFromObj,
+        dateTo: dateToObj,
+      });
+    } else if (dateFromObj) {
+      qb.andWhere("message.sentAt >= :dateFrom", {
+        dateFrom: dateFromObj,
+      });
+    } else if (dateToObj) {
+      qb.andWhere("message.sentAt <= :dateTo", {
+        dateTo: dateToObj,
+      });
+    }
+
+    const allMessages = await qb.getMany();
 
     // Get all users who sent or received messages
     const userIds = new Set<string>();
