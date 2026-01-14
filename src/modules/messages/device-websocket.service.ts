@@ -235,6 +235,8 @@ export class DeviceWebSocketService implements OnApplicationBootstrap {
     } else if (message.event === "user_action_required") {
       // Handle legacy format as well
       this.handleUserActionRequired(ws, message.data);
+    } else if (message.event === "factoryResetAcknowledged") {
+      this.handleFactoryResetAcknowledged(ws, message.data);
     } else {
       this.logger.warn(`Unknown message event: ${message.event}`);
     }
@@ -562,6 +564,50 @@ export class DeviceWebSocketService implements OnApplicationBootstrap {
       }
     } catch (error) {
       this.logger.error(`Lighting test result update error: ${error.message}`);
+    }
+  }
+
+  private async handleFactoryResetAcknowledged(ws: WebSocket, data: any) {
+    this.logger.log("🔄 Handling factory reset acknowledgment:", data);
+
+    const { deviceId, timestamp } = data;
+
+    if (!deviceId) {
+      this.logger.error(
+        "No deviceId provided in factoryResetAcknowledged event"
+      );
+      return;
+    }
+
+    try {
+      // Delete device from database
+      const device = await this.devicesService.findOne(deviceId);
+      if (device) {
+        await this.devicesService.remove(deviceId);
+        this.logger.log(
+          `✅ Device ${deviceId} has been completely removed from the database after factory reset acknowledgment`
+        );
+      } else {
+        this.logger.warn(
+          `Device ${deviceId} not found in database (may have been already deleted)`
+        );
+      }
+
+      // Close the WebSocket connection
+      this.removeDeviceConnection(ws);
+
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.close(1000, "Device factory reset completed");
+      }
+
+      this.logger.log(
+        `🔄 Factory reset completed for device: ${deviceId} at timestamp: ${timestamp}`
+      );
+    } catch (error) {
+      this.logger.error(
+        `❌ Error handling factory reset acknowledgment for device ${deviceId}: ${error.message}`,
+        error.stack
+      );
     }
   }
 

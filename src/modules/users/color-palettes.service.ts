@@ -151,12 +151,12 @@ export class ColorPalettesService {
     colors: any[],
     imageUrl?: string
   ): Promise<Message[]> {
-    // Verify all recipients are friends
+    // Verify all recipients are friends or self (for testing)
     const friends = await this.friendsService.getFriends(userId);
     const friendIds_mapped = friends.map((friend) => friend.id);
 
     const invalidRecipients = friendIds.filter(
-      (id) => !friendIds_mapped.includes(id)
+      (id) => id !== userId && !friendIds_mapped.includes(id)
     );
     if (invalidRecipients.length > 0) {
       throw new ForbiddenException(

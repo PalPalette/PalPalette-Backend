@@ -68,6 +68,10 @@ async function bootstrap() {
       "Push Notifications",
       "Push notification token registration and management"
     )
+    .addTag(
+      "Analytics",
+      "Anonymized analytics and data export for research purposes"
+    )
     .build();
 
   await SwaggerModule.loadPluginMetadata(metadata); // <-- here
